@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phaser Card Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            font-family: Arial, sans-serif;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        #debug-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background-color: #333;
+            display: flex;
+            z-index: 1000;
+        }
+        .menu-button {
+            padding: 10px 20px;
+            background-color: #555;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-right: 1px solid #444;
+        }
+        .menu-button:hover {
+            background-color: #666;
+        }
+        .menu-button.active {
+            background-color: #007acc;
+        }
+        #game-container {
+            margin-top: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: calc(100vh - 40px);
+            padding: 20px;
+        }
+        #game-container canvas {
+            border: 2px solid #333;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="debug-menu">
+        <button class="menu-button active" id="battle-mode">Battle</button>
+        <button class="menu-button" id="campaign-mode">Campaign</button>
+        <button class="menu-button" id="shop-mode">Shop</button>
+        <button class="menu-button" id="event-mode">Event</button>
+        <button class="menu-button" id="party-mode">Party</button>
+    </div>
+    <div id="game-container"></div>
+</body>
+</html>
