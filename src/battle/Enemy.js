@@ -30,7 +30,7 @@ export default class Enemy {
         try {
             if (this.artPath && this.scene.textures.exists(this.getTextureKey())) {
                 this.sprite = this.scene.add.image(this.x, this.y, this.getTextureKey());
-                this.sprite.setDisplaySize(240, 300);  // 160 * 1.5, 200 * 1.5
+                this.sprite.setDisplaySize(320, 400);  // Increased from 240x300 to 320x400
                 
                 // Improve image quality
                 this.sprite.setTexture(this.getTextureKey());
@@ -49,6 +49,7 @@ export default class Enemy {
         }
         
         this.createUI();
+        this.startIdleAnimation();
     }
     
     createFallbackSprite() {
@@ -58,8 +59,8 @@ export default class Enemy {
         else if (this.name === 'Orc') color = 0x8B0000; // Dark red
         else if (this.name === 'Troll') color = 0x696969; // Gray
         
-        this.sprite = this.scene.add.rectangle(this.x, this.y, 240, 300, color);  // 160 * 1.5, 200 * 1.5
-        this.sprite.setStrokeStyle(6, 0x654321);  // 4 * 1.5
+        this.sprite = this.scene.add.rectangle(this.x, this.y, 320, 400, color);  // Increased from 240x300 to 320x400
+        this.sprite.setStrokeStyle(8, 0x654321);  // Increased stroke thickness
         this.isImageSprite = false;
     }
     
@@ -80,8 +81,8 @@ export default class Enemy {
         
         // Target indicator (initially hidden)
         this.targetIndicator = this.scene.add.graphics();
-        this.targetIndicator.lineStyle(5, 0xffff00);  // 3 * 1.5 (rounded)
-        this.targetIndicator.strokeRect(this.x - 150, this.y - 180, 300, 360);  // 100 * 1.5, 120 * 1.5, 200 * 1.5, 240 * 1.5
+        this.targetIndicator.lineStyle(6, 0xffff00);  // Slightly thicker
+        this.targetIndicator.strokeRect(this.x - 200, this.y - 240, 400, 480);  // Adjusted for 320x400 sprite size
         this.targetIndicator.setVisible(false);
         
         // Make enemy clickable for targeting
@@ -164,12 +165,23 @@ export default class Enemy {
         this.isAlive = false;
         this.setTargeted(false);
         
-        // Death animation
+        // Kill all idle animations first
+        this.scene.tweens.killTweensOf(this.sprite);
+        
+        // Death animation - gentle fade out
         this.scene.tweens.add({
             targets: [this.sprite, this.healthBar, this.healthBarBg, this.nameText],
-            alpha: 0.3,
-            duration: 500,
-            ease: 'Power2'
+            alpha: 0,
+            duration: 1000,  // Slower, more gentle
+            ease: 'Linear',  // Smooth, even fade
+            onComplete: () => {
+                // Hide all elements completely after animation
+                if (this.sprite) this.sprite.setVisible(false);
+                if (this.healthBar) this.healthBar.setVisible(false);
+                if (this.healthBarBg) this.healthBarBg.setVisible(false);
+                if (this.nameText) this.nameText.setVisible(false);
+                if (this.targetIndicator) this.targetIndicator.setVisible(false);
+            }
         });
         
         // Notify battle manager (gold will be awarded at battle end)
@@ -235,6 +247,37 @@ export default class Enemy {
     
     isDefeated() {
         return !this.isAlive;
+    }
+    
+    startIdleAnimation() {
+        if (!this.sprite) return;
+        
+        // Store original position and scale
+        this.originalScaleX = this.sprite.scaleX;
+        this.originalScaleY = this.sprite.scaleY;
+        
+        // Very subtle horizontal sway
+        this.scene.tweens.add({
+            targets: this.sprite,
+            x: this.x + 4,  // Subtle 4px horizontal movement
+            duration: 3000 + Math.random() * 1000, // 3-4 seconds
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1,
+            delay: Math.random() * 1000 // Random start delay
+        });
+        
+        // Subtle scale breathing effect
+        this.scene.tweens.add({
+            targets: this.sprite,
+            scaleX: this.originalScaleX * 1.02,  // 2% scale change
+            scaleY: this.originalScaleY * 0.98,  // Slight squash
+            duration: 1500 + Math.random() * 500,
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1,
+            delay: Math.random() * 500
+        });
     }
     
     destroy() {

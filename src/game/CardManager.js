@@ -1,4 +1,5 @@
 import Card from './Card.js';
+import { getCurrentTheme } from '../config/CardThemes.js';
 
 export default class CardManager {
     constructor(scene) {
@@ -53,25 +54,45 @@ export default class CardManager {
     }
 
     createCardSprite(card, x, y, cardWidth = 300, cardHeight = 420) {
+        const theme = getCurrentTheme();
         const cardGraphics = this.scene.add.graphics();
         cardGraphics.x = x;
         cardGraphics.y = y;
         
-        const cornerRadius = Math.max(8, cardWidth * 0.04);
+        const cornerRadius = Math.max(theme.cornerRadius, cardWidth * 0.04);
         
-        // Card background with subtle gradient effect
-        cardGraphics.fillStyle(0xffffff);
-        cardGraphics.fillRoundedRect(0, 0, cardWidth, cardHeight, cornerRadius);
+        // Card background
+        if (theme.background.gradient) {
+            // Create gradient effect for magic theme
+            this.createGradientBackground(cardGraphics, cardWidth, cardHeight, cornerRadius, theme);
+        } else {
+            cardGraphics.fillStyle(theme.background.color);
+            cardGraphics.fillRoundedRect(0, 0, cardWidth, cardHeight, cornerRadius);
+        }
         
-        // Card border
-        cardGraphics.lineStyle(Math.max(2, cardWidth * 0.01), 0x333333);
+        // Main border
+        cardGraphics.lineStyle(theme.border.main.thickness, theme.border.main.color);
         cardGraphics.strokeRoundedRect(0, 0, cardWidth, cardHeight, cornerRadius);
         
-        // Inner border for more card-like appearance
-        cardGraphics.lineStyle(1, 0xdddddd);
-        cardGraphics.strokeRoundedRect(4, 4, cardWidth - 8, cardHeight - 8, cornerRadius - 2);
+        // Inner border
+        if (theme.border.inner) {
+            cardGraphics.lineStyle(theme.border.inner.thickness, theme.border.inner.color);
+            const offset = theme.border.inner.offset;
+            cardGraphics.strokeRoundedRect(offset, offset, cardWidth - offset*2, cardHeight - offset*2, cornerRadius - 2);
+        }
         
-        const color = (card.suit === 'Hearts' || card.suit === 'Diamonds') ? '#cc0000' : '#000000';
+        // Glow effect for magic theme
+        if (theme.border.glow) {
+            cardGraphics.lineStyle(theme.border.glow.thickness, theme.border.glow.color, theme.border.glow.alpha);
+            cardGraphics.strokeRoundedRect(-2, -2, cardWidth + 4, cardHeight + 4, cornerRadius + 2);
+        }
+        
+        // Add decorative elements for magic theme
+        if (theme.decorations) {
+            this.addMagicDecorations(cardGraphics, cardWidth, cardHeight, theme);
+        }
+        
+        const color = this.getSuitColor(card.suit, theme);
         
         const rankFontSize = Math.max(36, cardWidth * 0.18);  // Increased from 0.12 to 0.18
         const suitFontSize = Math.max(48, cardWidth * 0.24);  // Increased from 0.18 to 0.24
@@ -145,5 +166,73 @@ export default class CardManager {
 
     getDeckSize() {
         return this.deck.length;
+    }
+    
+    getSuitColor(suit, theme) {
+        switch(suit) {
+            case 'Hearts': return theme.text.hearts;
+            case 'Diamonds': return theme.text.diamonds;
+            case 'Clubs': return theme.text.clubs;
+            case 'Spades': return theme.text.spades;
+            default: return theme.text.spades;
+        }
+    }
+    
+    createGradientBackground(graphics, width, height, cornerRadius, theme) {
+        // Create multiple layers for gradient effect
+        const colors = theme.background.gradientColors;
+        
+        // Base background
+        graphics.fillStyle(colors[0]);
+        graphics.fillRoundedRect(0, 0, width, height, cornerRadius);
+        
+        // Gradient overlay (simulate with multiple rectangles)
+        graphics.fillStyle(colors[1], 0.8);
+        graphics.fillRoundedRect(width * 0.1, height * 0.1, width * 0.8, height * 0.8, cornerRadius - 2);
+        
+        graphics.fillStyle(colors[2], 0.6);
+        graphics.fillRoundedRect(width * 0.2, height * 0.2, width * 0.6, height * 0.6, cornerRadius - 4);
+    }
+    
+    addMagicDecorations(graphics, width, height, theme) {
+        const ornamentColor = theme.ornaments.colorOverride;
+        
+        if (theme.ornaments.corners) {
+            // Add corner ornaments
+            const ornamentSize = width * 0.08;
+            graphics.lineStyle(2, ornamentColor, 0.7);
+            
+            // Top-left corner ornament
+            graphics.beginPath();
+            graphics.arc(ornamentSize * 1.5, ornamentSize * 1.5, ornamentSize, Math.PI, Math.PI * 1.5);
+            graphics.strokePath();
+            
+            // Top-right corner ornament
+            graphics.beginPath();
+            graphics.arc(width - ornamentSize * 1.5, ornamentSize * 1.5, ornamentSize, Math.PI * 1.5, Math.PI * 2);
+            graphics.strokePath();
+            
+            // Bottom-left corner ornament
+            graphics.beginPath();
+            graphics.arc(ornamentSize * 1.5, height - ornamentSize * 1.5, ornamentSize, Math.PI * 0.5, Math.PI);
+            graphics.strokePath();
+            
+            // Bottom-right corner ornament
+            graphics.beginPath();
+            graphics.arc(width - ornamentSize * 1.5, height - ornamentSize * 1.5, ornamentSize, 0, Math.PI * 0.5);
+            graphics.strokePath();
+        }
+        
+        if (theme.ornaments.center) {
+            // Add center border decoration
+            graphics.lineStyle(1, ornamentColor, 0.4);
+            const centerX = width * 0.5;
+            const centerY = height * 0.5;
+            const decorRadius = Math.min(width, height) * 0.25;
+            
+            // Central mystical circle
+            graphics.strokeCircle(centerX, centerY, decorRadius);
+            graphics.strokeCircle(centerX, centerY, decorRadius * 0.7);
+        }
     }
 }

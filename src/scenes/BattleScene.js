@@ -8,6 +8,7 @@ import HeroManager from '../heroes/HeroManager.js';
 import { createHero } from '../heroes/HeroRegistry.js';
 import PartyManager from '../party/PartyManager.js';
 import { UIConfig } from '../config/UIConfig.js';
+import { setCardTheme, getCurrentTheme, getAvailableThemes } from '../config/CardThemes.js';
 
 export default class BattleScene extends Phaser.Scene {
     constructor() {
@@ -124,12 +125,12 @@ export default class BattleScene extends Phaser.Scene {
         this.handCardsContainer = this.add.container(screenWidth / 2, screenHeight - 60);  // Moved up from 40 to 60
         
         // Hero portraits area (above cards)
-        this.heroPortraitsContainer = this.add.container(screenWidth / 2, screenHeight - 600);  // 400 * 1.5
+        this.heroPortraitsContainer = this.add.container(screenWidth / 2, screenHeight - 500);  // Moved down from 600 to 500
         
         // Hand preview area
         this.handPreview = this.add.text(
             screenWidth / 2,
-            screenHeight - 330,     // 220 * 1.5
+            screenHeight - 280,     // Adjusted to fit between heroes and cards
             '',
             {
                 fontSize: '54px',   // 36 * 1.5
@@ -201,6 +202,25 @@ export default class BattleScene extends Phaser.Scene {
         this.sortButton.on('pointerover', () => this.sortButton.setTint(0xdddddd));
         this.sortButton.on('pointerout', () => this.sortButton.clearTint());
         
+        // Theme toggle button
+        this.themeButton = this.add.text(
+            screenWidth / 2 + 1050,    // Same x as sort button
+            screenHeight - 140,        // Below sort button
+            `Theme: ${getCurrentTheme().name}`,
+            {
+                fontSize: '36px',      // Slightly smaller than sort
+                color: '#ffffff',
+                fontFamily: 'Arial',
+                backgroundColor: '#444444',
+                padding: { x: 25, y: 15 }
+            }
+        );
+        this.themeButton.setOrigin(0.5);
+        this.themeButton.setInteractive();
+        this.themeButton.on('pointerdown', () => this.toggleCardTheme());
+        this.themeButton.on('pointerover', () => this.themeButton.setTint(0xdddddd));
+        this.themeButton.on('pointerout', () => this.themeButton.clearTint());
+        
         this.updateHeroDisplay();
         this.createHeroPortraits();
     }
@@ -217,7 +237,7 @@ export default class BattleScene extends Phaser.Scene {
         const spacing = 600;  // 400 * 1.5
         const totalWidth = (enemyTypes.length - 1) * spacing;
         const startX = (screenWidth - totalWidth) / 2;
-        const y = 450;  // Moved up from 600 to compensate for larger UI
+        const y = 350;  // Moved up further from 450 to 350
         
         enemyTypes.forEach((enemyType, index) => {
             const enemy = EnemyFactory.createEnemy(this, startX + (index * spacing), y, enemyType);
@@ -703,6 +723,22 @@ Hover over cards for preview`;
     updateSortButtonText(sortByRank) {
         // Show what mode it will switch TO, not what it's currently on
         this.sortButton.setText(sortByRank ? 'Sort: Suit' : 'Sort: Rank');
+    }
+    
+    toggleCardTheme() {
+        const themes = getAvailableThemes();
+        const currentTheme = getCurrentTheme();
+        
+        // Simple toggle between classic and magic
+        const nextTheme = currentTheme.name === 'Classic' ? 'magic' : 'classic';
+        
+        setCardTheme(nextTheme);
+        this.themeButton.setText(`Theme: ${getCurrentTheme().name}`);
+        
+        // Refresh the current hand display to show new theme
+        if (this.battleManager && this.battleManager.playerHand) {
+            this.updateHandDisplay(this.battleManager.playerHand, this.battleManager.selectedCards);
+        }
     }
     
     createHeroPortraits() {
