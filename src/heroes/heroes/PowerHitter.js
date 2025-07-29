@@ -8,7 +8,7 @@ class FaceCardTrigger extends Trigger {
             description: 'Triggers when playing face cards (J, Q, K, A)'
         });
     }
-    
+
     check(pokerHand, context, heroState) {
         if (!context.selectedCards) return false;
         return context.selectedCards.some(card => {
@@ -24,10 +24,10 @@ export default class PowerHitter extends Hero {
             id: 'power_hitter',
             name: 'Power Hitter',
             type: 'damage',
-            portraitKey: 'power_hitter'
+            portraitKey: 'mage1'
         });
     }
-    
+
     setupAbilities() {
         const faceCardPower = new Ability({
             name: 'Face Card Mastery',
@@ -39,7 +39,7 @@ export default class PowerHitter extends Hero {
                 new MultiplierEffect(1.4)
             ]
         });
-        
+
         this.addAbility(faceCardPower);
     }
 }

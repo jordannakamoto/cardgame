@@ -1,0 +1,87 @@
+// Global UI configuration for responsive design
+export const UIConfig = {
+    // Hero portrait settings
+    hero: {
+        portraitWidth: 360,      // 240 * 1.5
+        portraitHeight: 225,     // 150 * 1.5
+        spacing: 390,            // 260 * 1.5
+        glowThickness: 12,       // 8 * 1.5
+        
+        // Ability activation colors
+        abilityColors: {
+            damage: 0xff8800,      // Orange for damage abilities
+            defensive: 0x888888,   // Grey for defensive abilities
+            utility: 0x8888ff,     // Blue for utility abilities
+            resource: 0xffdd00     // Gold for resource abilities
+        },
+        
+        // Tooltip settings
+        tooltip: {
+            width: 900,          // 600 * 1.5
+            height: 450,         // 300 * 1.5
+            fontSize: 63,        // 42 * 1.5
+            nameSize: 72,        // 48 * 1.5
+            minFontSize: 57,     // 38 * 1.5
+            maxFontSize: 81      // 54 * 1.5
+        },
+        
+        // Mana bar settings (now used for HP bar)
+        manaBar: {
+            height: 21,          // 14 * 1.5
+            offset: 8            // 5 * 1.5 (rounded)
+        }
+    },
+    
+    // Card settings
+    card: {
+        width: 180,              // 120 * 1.5
+        height: 252,             // 168 * 1.5
+        spacing: 210             // 140 * 1.5
+    },
+    
+    // Enemy settings
+    enemy: {
+        width: 240,              // 160 * 1.5
+        height: 300,             // 200 * 1.5
+        spacing: 270             // 180 * 1.5
+    },
+    
+    // Responsive breakpoints
+    breakpoints: {
+        small: 1280,
+        medium: 1920,
+        large: 2560
+    },
+    
+    // Get scaled values based on screen size
+    getScaledValue: function(baseValue, factor = 1) {
+        const width = (typeof window !== 'undefined' ? window.innerWidth : null) || 2560;
+        const scale = Math.max(0.8, Math.min(2.0, width / 2560)); // Scale between 80% and 200%
+        return Math.floor(baseValue * scale * factor);
+    },
+    
+    // Get responsive font size with minimum
+    getResponsiveFontSize: function(baseSize, minSize = 12) {
+        const width = (typeof window !== 'undefined' ? window.innerWidth : null) || 2560;
+        const scale = Math.max(0.8, Math.min(2.0, width / 2560));
+        return Math.max(minSize, Math.floor(baseSize * scale));
+    }
+};
+
+// Update config based on screen size
+export function updateUIConfig() {
+    if (typeof window !== 'undefined') {
+        const width = window.innerWidth || 2560;
+        const scale = Math.max(0.8, Math.min(2.0, width / 2560));
+        
+        // Update tooltip font sizes based on screen size
+        UIConfig.hero.tooltip.fontSize = Math.max(38, Math.floor(42 * scale));
+        UIConfig.hero.tooltip.nameSize = Math.max(42, Math.floor(48 * scale));
+    }
+}
+
+// Initialize on load
+if (typeof window !== 'undefined') {
+    updateUIConfig();
+    window.addEventListener('resize', updateUIConfig);
+}

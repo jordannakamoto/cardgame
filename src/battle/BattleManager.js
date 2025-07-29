@@ -202,8 +202,8 @@ export default class BattleManager {
                 enemyCount: this.enemies.filter(e => e.isAlive).length
             });
             
-            // Generate mana from played cards
-            this.scene.heroManager.generateManaForActiveHero(selectedCards);
+            // Generate mana from played cards (disabled for now)
+            // this.scene.heroManager.generateManaForActiveHero(selectedCards);
         }
         
         // Show hand result

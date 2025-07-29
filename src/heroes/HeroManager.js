@@ -48,11 +48,15 @@ export default class HeroManager {
     
     // Calculate damage with hero multiplier
     calculateDamageWithHero(baseDamage, pokerHand, context = {}) {
-        const hero = this.getActiveHero();
-        if (!hero) return baseDamage;
+        let totalMultiplier = 1.0;
         
-        const multiplier = hero.calculateMultiplier(pokerHand, context);
-        return Math.floor(baseDamage * multiplier);
+        // Check all heroes in party for abilities that might activate
+        this.heroes.forEach(hero => {
+            const heroMultiplier = hero.calculateMultiplier(pokerHand, context);
+            totalMultiplier *= heroMultiplier;
+        });
+        
+        return Math.floor(baseDamage * totalMultiplier);
     }
     
     // Generate mana for active hero

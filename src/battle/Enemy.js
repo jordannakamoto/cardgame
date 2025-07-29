@@ -30,7 +30,7 @@ export default class Enemy {
         try {
             if (this.artPath && this.scene.textures.exists(this.getTextureKey())) {
                 this.sprite = this.scene.add.image(this.x, this.y, this.getTextureKey());
-                this.sprite.setDisplaySize(160, 200);
+                this.sprite.setDisplaySize(240, 300);  // 160 * 1.5, 200 * 1.5
                 
                 // Improve image quality
                 this.sprite.setTexture(this.getTextureKey());
@@ -58,30 +58,30 @@ export default class Enemy {
         else if (this.name === 'Orc') color = 0x8B0000; // Dark red
         else if (this.name === 'Troll') color = 0x696969; // Gray
         
-        this.sprite = this.scene.add.rectangle(this.x, this.y, 160, 200, color);
-        this.sprite.setStrokeStyle(4, 0x654321);
+        this.sprite = this.scene.add.rectangle(this.x, this.y, 240, 300, color);  // 160 * 1.5, 200 * 1.5
+        this.sprite.setStrokeStyle(6, 0x654321);  // 4 * 1.5
         this.isImageSprite = false;
     }
     
     createUI() {
         // Enemy name
-        this.nameText = this.scene.add.text(this.x, this.y - 140, this.name, {
-            fontSize: '28px',
+        this.nameText = this.scene.add.text(this.x, this.y - 210, this.name, {  // 140 * 1.5
+            fontSize: '42px',  // 28 * 1.5
             color: '#ffffff',
             fontFamily: 'Arial'
         });
         this.nameText.setOrigin(0.5);
         
         // Health bar background
-        this.healthBarBg = this.scene.add.rectangle(this.x, this.y + 140, 160, 16, 0x444444);
+        this.healthBarBg = this.scene.add.rectangle(this.x, this.y + 210, 240, 24, 0x444444);  // 140 * 1.5, 160 * 1.5, 16 * 1.5
         
         // Health bar
-        this.healthBar = this.scene.add.rectangle(this.x, this.y + 140, 160, 16, 0x00ff00);
+        this.healthBar = this.scene.add.rectangle(this.x, this.y + 210, 240, 24, 0xff4444);  // 140 * 1.5, 160 * 1.5, 16 * 1.5
         
         // Target indicator (initially hidden)
         this.targetIndicator = this.scene.add.graphics();
-        this.targetIndicator.lineStyle(3, 0xffff00);
-        this.targetIndicator.strokeRect(this.x - 100, this.y - 120, 200, 240);
+        this.targetIndicator.lineStyle(5, 0xffff00);  // 3 * 1.5 (rounded)
+        this.targetIndicator.strokeRect(this.x - 150, this.y - 180, 300, 360);  // 100 * 1.5, 120 * 1.5, 200 * 1.5, 240 * 1.5
         this.targetIndicator.setVisible(false);
         
         // Make enemy clickable for targeting
@@ -98,8 +98,8 @@ export default class Enemy {
         this.updateHealthBar();
         
         // Create damage text
-        const damageText = this.scene.add.text(this.x, this.y - 60, `-${amount}`, {
-            fontSize: '40px',
+        const damageText = this.scene.add.text(this.x, this.y - 90, `-${amount}`, {  // 60 * 1.5
+            fontSize: '60px',  // 40 * 1.5
             color: '#ff0000',
             fontFamily: 'Arial',
             fontStyle: 'bold'
@@ -150,14 +150,14 @@ export default class Enemy {
     
     updateHealthBar() {
         const healthPercent = this.currentHealth / this.maxHealth;
-        const newWidth = 160 * healthPercent;
+        const newWidth = 240 * healthPercent;  // 160 * 1.5
         
         // Update width but keep position fixed at center
         this.healthBar.width = newWidth;
         this.healthBar.x = this.x; // Keep centered on enemy
         
-        // Keep health bar green at all times
-        this.healthBar.setFillStyle(0x00ff00);
+        // Keep health bar red at all times
+        this.healthBar.setFillStyle(0xff4444);
     }
     
     die() {
@@ -196,23 +196,23 @@ export default class Enemy {
         const afterDamageHealth = Math.max(0, this.currentHealth - damage);
         const afterDamagePercent = afterDamageHealth / this.maxHealth;
         
-        const currentWidth = 160 * healthPercent;
-        const afterWidth = 160 * afterDamagePercent;
+        const currentWidth = 240 * healthPercent;  // 160 * 1.5
+        const afterWidth = 240 * afterDamagePercent;  // 160 * 1.5
         const damageWidth = currentWidth - afterWidth;
         
         if (damageWidth > 0) {
-            // Health bar starts at this.x - 80 and is 160 wide
+            // Health bar starts at this.x - 120 and is 240 wide  // 80 * 1.5, 160 * 1.5
             // afterWidth is the width of remaining health
             // We want to position the damage preview right after the remaining health
-            const damageStartX = this.x - 80 + afterWidth;
+            const damageStartX = this.x - 120 + afterWidth;  // 80 * 1.5
             
             this.damagePreview = this.scene.add.rectangle(
                 damageStartX + (damageWidth / 2), // Center the damage rectangle in its section
-                this.y + 140,
+                this.y + 210,  // 140 * 1.5
                 damageWidth,
-                16,
-                0xff0000,
-                0.6 // Semi-transparent red
+                24,  // 16 * 1.5
+                0x555555,
+                0.8 // Semi-transparent dark grey
             );
         }
         

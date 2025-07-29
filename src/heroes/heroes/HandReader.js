@@ -52,7 +52,7 @@ export default class Phantom extends Hero {
             id: 'phantom',
             name: 'The Phantom',
             type: 'support',
-            portraitKey: 'phantom'
+            portraitKey: 'warrior2'
         });
     }
     

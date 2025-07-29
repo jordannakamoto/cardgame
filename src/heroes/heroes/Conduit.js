@@ -8,7 +8,7 @@ class RoundStartTrigger extends Trigger {
             description: 'Triggers at the start of each round'
         });
     }
-    
+
     check(pokerHand, context, heroState) {
         return context.isRoundStart === true;
     }
@@ -25,7 +25,7 @@ class GoldSpendEffect extends Effect {
         this.chipsBonus = chipsBonus;
         this.multBonus = multBonus;
     }
-    
+
     execute(context, heroState, activeTriggers) {
         if (context.offerGoldSpend) {
             context.offerGoldSpend({
@@ -34,7 +34,7 @@ class GoldSpendEffect extends Effect {
                 multBonus: this.multBonus,
                 onAccept: () => {
                     heroState.conduitActive = true;
-                    
+
                     // Publish the move
                     if (context.hero && context.hero.publishMove) {
                         context.hero.publishMove('conduitActivated', {
@@ -48,7 +48,7 @@ class GoldSpendEffect extends Effect {
             });
         }
     }
-    
+
     apply(pokerHand, context, heroState, activeTriggers) {
         if (context.isRoundStart) {
             this.execute(context, heroState, activeTriggers);
@@ -67,7 +67,7 @@ class ConduitBoostEffect extends Effect {
         this.chipsBonus = chipsBonus;
         this.multBonus = multBonus;
     }
-    
+
     apply(pokerHand, context, heroState, activeTriggers) {
         if (heroState.conduitActive) {
             // Apply bonuses to context
@@ -88,10 +88,10 @@ export default class Conduit extends Hero {
             id: 'conduit',
             name: 'The Conduit',
             type: 'hybrid',
-            portraitKey: 'conduit'
+            portraitKey: 'jackpot1'
         });
     }
-    
+
     setupAbilities() {
         // Ability 1: Offer gold spending at round start
         const goldSpendOffer = new Ability({
@@ -104,7 +104,7 @@ export default class Conduit extends Hero {
                 new GoldSpendEffect(5, 50, 5)
             ]
         });
-        
+
         // Ability 2: Apply bonuses when active
         const conduitBoost = new Ability({
             name: 'Channeled Power',
@@ -116,26 +116,26 @@ export default class Conduit extends Hero {
                 new ConduitBoostEffect(50, 5)
             ]
         });
-        
+
         this.addAbility(goldSpendOffer);
         this.addAbility(conduitBoost);
     }
-    
+
     onRoundStart(data) {
         // Reset conduit state and offer activation
         this.state.conduitActive = false;
-        
+
         const context = {
             isRoundStart: true,
             roundNumber: data.roundNumber,
             hero: this,
             offerGoldSpend: data.offerGoldSpend
         };
-        
+
         // Trigger the gold spend offer
         this.abilities[0].activate(context, this.state);
     }
-    
+
     onHandPlayed(data) {
         // Apply conduit bonuses to played hands
         if (this.state.conduitActive) {
@@ -143,7 +143,7 @@ export default class Conduit extends Hero {
                 hero: this,
                 applyBonus: data.applyBonus
             };
-            
+
             this.abilities[1].activate(context, this.state);
         }
     }
@@ -157,7 +157,7 @@ class AlwaysActiveTrigger extends Trigger {
             description: 'Always active'
         });
     }
-    
+
     check(pokerHand, context, heroState) {
         return true;
     }

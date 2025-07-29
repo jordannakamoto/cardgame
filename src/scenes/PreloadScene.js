@@ -20,6 +20,13 @@ export default class PreloadScene extends Phaser.Scene {
         
         // Load hero portraits
         this.load.image('warrior2', 'heroes/warrior2.png');
+        this.load.image('mage1', 'heroes/mage1.png');
+        this.load.image('mage2', 'heroes/mage2.png');
+        this.load.image('guardian1', 'heroes/guardian1.png');
+        this.load.image('jackpot1', 'heroes/jackpot1.png');
+        
+        // Load battle backdrop
+        this.load.image('battle-backdrop', 'battle/backdrop.png');
         
         this.createLoadingBar();
     }

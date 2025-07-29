@@ -73,9 +73,9 @@ export default class CardManager {
         
         const color = (card.suit === 'Hearts' || card.suit === 'Diamonds') ? '#cc0000' : '#000000';
         
-        const rankFontSize = Math.max(24, cardWidth * 0.12);
-        const suitFontSize = Math.max(36, cardWidth * 0.18);
-        const centerSuitSize = Math.max(60, cardWidth * 0.25);
+        const rankFontSize = Math.max(36, cardWidth * 0.18);  // Increased from 0.12 to 0.18
+        const suitFontSize = Math.max(48, cardWidth * 0.24);  // Increased from 0.18 to 0.24
+        const centerSuitSize = Math.max(80, cardWidth * 0.35); // Increased from 0.25 to 0.35
         
         // Top-left rank and suit
         const topRankText = this.scene.add.text(x + cardWidth * 0.08, y + cardHeight * 0.06, card.rank, {

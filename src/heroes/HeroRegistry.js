@@ -3,7 +3,7 @@ import StarterHero from './heroes/StarterHero.js';
 import Analyst from './heroes/CardShark.js'; // CardShark.js now contains Analyst
 import PowerHitter from './heroes/PowerHitter.js';
 import Phantom from './heroes/HandReader.js'; // HandReader.js now contains Phantom
-import Guardian from './heroes/LuckyCharm.js'; // LuckyCharm.js now contains Guardian
+import Guardian from './heroes/Guardian.js'; // LuckyCharm.js now contains Guardian
 import Conduit from './heroes/Conduit.js';
 
 export const HeroClasses = {

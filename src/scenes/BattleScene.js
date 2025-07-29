@@ -5,8 +5,9 @@ import Enemy from '../battle/Enemy.js';
 import Inventory from '../inventory/Inventory.js';
 import { EnemyTypes, EnemyFactory } from '../battle/EnemyTypes.js';
 import HeroManager from '../heroes/HeroManager.js';
-import StarterHero from '../heroes/heroes/StarterHero.js';
+import { createHero } from '../heroes/HeroRegistry.js';
 import PartyManager from '../party/PartyManager.js';
+import { UIConfig } from '../config/UIConfig.js';
 
 export default class BattleScene extends Phaser.Scene {
     constructor() {
@@ -27,6 +28,17 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     create() {
+        // Add battle backdrop
+        const screenWidth = this.cameras.main.width;
+        const screenHeight = this.cameras.main.height;
+        const backdrop = this.add.image(screenWidth / 2, screenHeight / 2, 'battle-backdrop');
+        
+        // Scale backdrop to cover the entire screen
+        const scaleX = screenWidth / backdrop.width;
+        const scaleY = screenHeight / backdrop.height;
+        const scale = Math.max(scaleX, scaleY);
+        backdrop.setScale(scale);
+        
         // Initialize managers
         this.cardManager = new CardManager(this);
         this.battleManager = new BattleManager(this);
@@ -37,8 +49,8 @@ export default class BattleScene extends Phaser.Scene {
         // Initialize party manager if not provided
         if (!this.partyManager) {
             this.partyManager = new PartyManager(this);
-            // Create starter hero
-            const starterHero = new StarterHero();
+            // Create starter hero using the registry (ensures proper initialization)
+            const starterHero = createHero('starter_hero');
             this.partyManager.purchaseHero(starterHero);
         }
         
@@ -68,32 +80,32 @@ export default class BattleScene extends Phaser.Scene {
         const screenWidth = this.cameras.main.width;
         const screenHeight = this.cameras.main.height;
         
-        // Battle title
-        this.titleText = this.add.text(
-            screenWidth / 2,
-            60,
-            'BATTLE',
-            {
-                fontSize: '64px',
-                color: '#ffffff',
-                fontFamily: 'Arial',
-                fontStyle: 'bold'
-            }
-        );
-        this.titleText.setOrigin(0.5);
+        // Battle title (removed - backdrop provides context)
+        // this.titleText = this.add.text(
+        //     screenWidth / 2,
+        //     90,
+        //     'BATTLE',
+        //     {
+        //         fontSize: '96px',      // 64 * 1.5
+        //         color: '#ffffff',
+        //         fontFamily: 'Arial',
+        //         fontStyle: 'bold'
+        //     }
+        // );
+        // this.titleText.setOrigin(0.5);
         
         // Info button (small 'i' in corner)
         this.infoButton = this.add.text(
-            screenWidth - 60,
-            60,
+            screenWidth - 90,
+            90,
             'i',
             {
-                fontSize: '40px',
+                fontSize: '60px',      // 40 * 1.5
                 color: '#cccccc',
                 fontFamily: 'Arial',
                 fontStyle: 'bold',
                 backgroundColor: '#333333',
-                padding: { x: 16, y: 12 }
+                padding: { x: 24, y: 18 }  // 16 * 1.5, 12 * 1.5
             }
         );
         this.infoButton.setOrigin(0.5);
@@ -109,18 +121,18 @@ export default class BattleScene extends Phaser.Scene {
         this.infoMenuVisible = false;
         
         // Hand cards display area
-        this.handCardsContainer = this.add.container(screenWidth / 2, screenHeight - 40);
+        this.handCardsContainer = this.add.container(screenWidth / 2, screenHeight - 60);  // Moved up from 40 to 60
         
         // Hero portraits area (above cards)
-        this.heroPortraitsContainer = this.add.container(screenWidth / 2, screenHeight - 400);
+        this.heroPortraitsContainer = this.add.container(screenWidth / 2, screenHeight - 600);  // 400 * 1.5
         
         // Hand preview area
         this.handPreview = this.add.text(
             screenWidth / 2,
-            screenHeight - 220,
+            screenHeight - 330,     // 220 * 1.5
             '',
             {
-                fontSize: '36px',
+                fontSize: '54px',   // 36 * 1.5
                 color: '#ffff00',
                 fontFamily: 'Arial',
                 fontStyle: 'bold',
@@ -131,11 +143,11 @@ export default class BattleScene extends Phaser.Scene {
         
         // Gold display
         this.goldDisplay = this.add.text(
-            60,
-            60,
+            90,                     // 60 * 1.5
+            90,                     // 60 * 1.5
             'Gold: 0',
             {
-                fontSize: '36px',
+                fontSize: '54px',   // 36 * 1.5
                 color: '#ffdd00',
                 fontFamily: 'Arial',
                 fontStyle: 'bold'
@@ -143,20 +155,20 @@ export default class BattleScene extends Phaser.Scene {
         );
         this.goldDisplay.setOrigin(0, 0.5);
         
-        // Hero display
-        this.heroDisplay = this.add.text(
-            60,
-            120,
-            '',
-            {
-                fontSize: '28px',
-                color: '#ffffff',
-                fontFamily: 'Arial'
-            }
-        );
-        this.heroDisplay.setOrigin(0, 0.5);
+        // Hero display (removed - now shown in portraits)
+        // this.heroDisplay = this.add.text(
+        //     90,                     // 60 * 1.5
+        //     180,                    // 120 * 1.5
+        //     '',
+        //     {
+        //         fontSize: '42px',   // 28 * 1.5
+        //         color: '#ffffff',
+        //         fontFamily: 'Arial'
+        //     }
+        // );
+        // this.heroDisplay.setOrigin(0, 0.5);
         
-        // Mana display
+        // Mana display (hidden for now)
         this.manaDisplay = this.add.text(
             60,
             160,
@@ -168,18 +180,19 @@ export default class BattleScene extends Phaser.Scene {
             }
         );
         this.manaDisplay.setOrigin(0, 0.5);
+        this.manaDisplay.setVisible(false); // Hide mana display
         
         // Sort toggle button (positioned to the right of card hand area)
         this.sortButton = this.add.text(
-            screenWidth / 2 + 700,
-            screenHeight - 40,
+            screenWidth / 2 + 1050,    // 700 * 1.5
+            screenHeight - 80,         // Adjusted to match new card position
             'Sort: Suit',
             {
-                fontSize: '28px',
+                fontSize: '42px',      // 28 * 1.5
                 color: '#ffffff',
                 fontFamily: 'Arial',
                 backgroundColor: '#333333',
-                padding: { x: 20, y: 12 }
+                padding: { x: 30, y: 18 }  // 20 * 1.5, 12 * 1.5
             }
         );
         this.sortButton.setOrigin(0.5);
@@ -201,10 +214,10 @@ export default class BattleScene extends Phaser.Scene {
         ];
         
         const screenWidth = this.cameras.main.width;
-        const spacing = 400;
+        const spacing = 600;  // 400 * 1.5
         const totalWidth = (enemyTypes.length - 1) * spacing;
         const startX = (screenWidth - totalWidth) / 2;
-        const y = 600;
+        const y = 450;  // Moved up from 600 to compensate for larger UI
         
         enemyTypes.forEach((enemyType, index) => {
             const enemy = EnemyFactory.createEnemy(this, startX + (index * spacing), y, enemyType);
@@ -324,7 +337,7 @@ Hover over cards for preview`;
         this.updateHandPreview(cards, selectedCards);
         
         // Display cards
-        const cardSpacing = 160;
+        const cardSpacing = UIConfig.card.spacing;  // Now 210
         const startX = -(cards.length - 1) * cardSpacing / 2;
         
         // Store previous selection state to avoid replaying animations
@@ -359,8 +372,8 @@ Hover over cards for preview`;
             }
             
             // Use CardManager's improved card rendering
-            const cardWidth = 120;
-            const cardHeight = 168;
+            const cardWidth = UIConfig.card.width;   // Now 180
+            const cardHeight = UIConfig.card.height; // Now 252
             const cardData = this.cardManager.createCardSprite(card, 0, 0, cardWidth, cardHeight);
             
             // Adjust the card elements' positions to be centered
@@ -386,8 +399,8 @@ Hover over cards for preview`;
             }
             
             // Card number indicator
-            const numberText = this.add.text(0, cardHeight/2 + 20, (index + 1).toString(), {
-                fontSize: '24px',
+            const numberText = this.add.text(0, cardHeight/2 + 30, (index + 1).toString(), {
+                fontSize: '36px',  // Increased from 24px
                 color: '#666666',
                 fontFamily: 'Arial',
                 fontStyle: 'bold'
@@ -459,15 +472,30 @@ Hover over cards for preview`;
                 if (!currentTarget || !currentTarget.isAlive || currentTarget.currentHealth <= 0) {
                     this.handPreview.setText('');
                     this.clearAllDamagePreview();
-                    this.updateHeroActivationIndicator(false);
+                    this.updateHeroActivationIndicator([]);
                     return;
                 }
                 
+                // Check which heroes will activate for this hand
+                let activatedHeroes = [];
                 if (this.scene.get('BattleScene').heroManager) {
-                    finalDamage = this.scene.get('BattleScene').heroManager.calculateDamageWithHero(baseDamage, pokerHand, {
+                    const context = {
                         targetEnemy: currentTarget,
                         selectedCards: selectedCardObjects
+                    };
+                    
+                    // Check each hero individually to see which ones activate
+                    this.scene.get('BattleScene').heroManager.getAllHeroes().forEach(hero => {
+                        const heroMultiplier = hero.calculateMultiplier(pokerHand, context);
+                        if (hero.hasActivatedAbilities()) {
+                            activatedHeroes.push({
+                                hero: hero,
+                                abilities: hero.lastActivatedAbilities
+                            });
+                        }
                     });
+                    
+                    finalDamage = this.scene.get('BattleScene').heroManager.calculateDamageWithHero(baseDamage, pokerHand, context);
                     heroModified = finalDamage !== baseDamage;
                 }
                 
@@ -479,7 +507,7 @@ Hover over cards for preview`;
                 this.handPreview.setText(previewText);
                 
                 // Indicate hero ability activation in portrait
-                this.updateHeroActivationIndicator(heroModified);
+                this.updateHeroActivationIndicator(activatedHeroes);
                 
                 // Update target health bar indicator
                 this.updateTargetDamageIndicator(finalDamage);
@@ -511,19 +539,19 @@ Hover over cards for preview`;
         });
     }
     
-    updateHeroActivationIndicator(isActivated) {
+    updateHeroActivationIndicator(activatedHeroes) {
         // Clear any existing activation effects
-        if (this.heroActivationEffect) {
-            this.heroActivationEffect.destroy();
-            this.heroActivationEffect = null;
+        if (this.heroActivationEffects) {
+            this.heroActivationEffects.forEach(effect => effect.destroy());
         }
-        if (this.heroBonusText) {
-            this.heroBonusText.destroy();
-            this.heroBonusText = null;
+        if (this.heroBonusTexts) {
+            this.heroBonusTexts.forEach(text => text.destroy());
         }
+        this.heroActivationEffects = [];
+        this.heroBonusTexts = [];
         
-        // Reset portrait positions if deactivating
-        if (!isActivated && this.heroManager) {
+        // Reset all portrait positions if no heroes activated
+        if ((!activatedHeroes || activatedHeroes.length === 0) && this.heroManager) {
             const heroes = this.heroManager.getAllHeroes();
             const portraitContainers = this.heroPortraitsContainer.list;
             
@@ -541,23 +569,38 @@ Hover over cards for preview`;
                     }
                 }
             });
+            return;
         }
         
-        if (isActivated && this.heroManager) {
-            const activeHero = this.heroManager.getActiveHero();
-            if (activeHero) {
-                const heroes = this.heroManager.getAllHeroes();
-                const activeIndex = heroes.indexOf(activeHero);
-                
-                // Get the active hero's portrait container
-                const portraitContainers = this.heroPortraitsContainer.list;
-                if (portraitContainers[activeIndex]) {
-                    const portraitContainer = portraitContainers[activeIndex];
+        if (activatedHeroes && activatedHeroes.length > 0 && this.heroManager) {
+            const allHeroes = this.heroManager.getAllHeroes();
+            const portraitContainers = this.heroPortraitsContainer.list;
+            
+            // Show activation effects for each activated hero
+            activatedHeroes.forEach(heroData => {
+                const activatedHero = heroData.hero;
+                const heroIndex = allHeroes.indexOf(activatedHero);
+                if (heroIndex !== -1 && portraitContainers[heroIndex]) {
+                    const portraitContainer = portraitContainers[heroIndex];
                     
-                    // Create glowing effect around active hero portrait
+                    // Determine color based on activated ability types
+                    let glowColor = UIConfig.hero.abilityColors.damage; // Default
+                    if (heroData.abilities && heroData.abilities.length > 0) {
+                        // Use the first activated ability's type for color
+                        const abilityType = heroData.abilities[0].type || 'damage';
+                        glowColor = UIConfig.hero.abilityColors[abilityType] || UIConfig.hero.abilityColors.damage;
+                    }
+                    
+                    // Create glowing effect around activated hero portrait
                     const glowEffect = this.add.graphics();
-                    glowEffect.lineStyle(8, 0xff8800, 1.0);
-                    glowEffect.strokeRoundedRect(-85, -55, 170, 110, 12);
+                    glowEffect.lineStyle(UIConfig.hero.glowThickness, glowColor, 1.0);
+                    glowEffect.strokeRoundedRect(
+                        -UIConfig.hero.portraitWidth/2 - 5, 
+                        -UIConfig.hero.portraitHeight/2 - 5, 
+                        UIConfig.hero.portraitWidth + 10, 
+                        UIConfig.hero.portraitHeight + 10, 
+                        12
+                    );
                     
                     // Position at the same location as the portrait container
                     glowEffect.x = this.heroPortraitsContainer.x + portraitContainer.x;
@@ -595,22 +638,22 @@ Hover over cards for preview`;
                     });
                     
                     // Add bonus indicator text next to portrait
-                    this.heroBonusText = this.add.text(
+                    const heroBonusText = this.add.text(
                         this.heroPortraitsContainer.x + portraitContainer.x + 90,
                         this.heroPortraitsContainer.y + portraitContainer.originalY - 28, // Use original position minus offset
                         '+',
                         {
                             fontSize: '32px',
-                            color: '#ff8800',
+                            color: `#${glowColor.toString(16).padStart(6, '0')}`,
                             fontFamily: 'Arial',
                             fontStyle: 'bold'
                         }
                     );
-                    this.heroBonusText.setOrigin(0.5);
+                    heroBonusText.setOrigin(0.5);
                     
                     // Add pulsing animation to bonus text and move it up too
                     this.tweens.add({
-                        targets: this.heroBonusText,
+                        targets: heroBonusText,
                         scaleX: { from: 1.0, to: 1.3 },
                         scaleY: { from: 1.0, to: 1.3 },
                         duration: 600,
@@ -621,15 +664,16 @@ Hover over cards for preview`;
                     
                     // Move the bonus text up with the portrait (to fixed position)
                     this.tweens.add({
-                        targets: this.heroBonusText,
+                        targets: heroBonusText,
                         y: this.heroPortraitsContainer.y + portraitContainer.originalY - 36, // Fixed position
                         duration: 300,
                         ease: 'Back.out'
                     });
                     
-                    this.heroActivationEffect = glowEffect;
+                    this.heroActivationEffects.push(glowEffect);
+                    this.heroBonusTexts.push(heroBonusText);
                 }
-            }
+            });
         }
     }
     
@@ -644,11 +688,12 @@ Hover over cards for preview`;
     }
     
     updateHeroDisplay() {
-        const hero = this.heroManager.getActiveHero();
-        if (hero) {
-            this.heroDisplay.setText(`Hero: ${hero.name}`);
-            this.updateManaDisplay(hero.currentMana, hero.maxMana);
-        }
+        // Hero display removed - now shown in portraits
+        // const hero = this.heroManager.getActiveHero();
+        // if (hero) {
+        //     this.heroDisplay.setText(`Hero: ${hero.name} (${hero.currentHealth}/${hero.maxHealth} HP)`);
+        //     // this.updateManaDisplay(hero.currentMana, hero.maxMana); // Disabled for now
+        // }
     }
     
     updateManaDisplay(current, max) {
@@ -673,9 +718,9 @@ Hover over cards for preview`;
         
         if (heroes.length === 0) return;
         
-        const portraitWidth = 160;
-        const portraitHeight = 100;
-        const spacing = 180;
+        const portraitWidth = UIConfig.hero.portraitWidth;
+        const portraitHeight = UIConfig.hero.portraitHeight;
+        const spacing = UIConfig.hero.spacing;
         const startX = -(heroes.length - 1) * spacing / 2;
         
         heroes.forEach((hero, index) => {
@@ -706,22 +751,33 @@ Hover over cards for preview`;
             }
             
             
-            // Mana bar background
-            const manaBarBg = this.add.rectangle(0, portraitHeight/2 + 35, portraitWidth - 10, 8, 0x333333);
+            // HP bar background
+            const hpBarBg = this.add.rectangle(0, portraitHeight/2 + UIConfig.hero.manaBar.offset, portraitWidth - 10, UIConfig.hero.manaBar.height, 0x333333);
             
-            // Mana bar
-            const manaPercent = hero.currentMana / hero.maxMana;
-            const manaBarWidth = (portraitWidth - 10) * manaPercent;
-            const manaBar = this.add.rectangle(
-                -(portraitWidth - 10)/2 + manaBarWidth/2, 
-                portraitHeight/2 + 35, 
-                manaBarWidth, 
-                8, 
-                0x6666ff
+            // HP bar
+            const hpPercent = hero.currentHealth / hero.maxHealth;
+            const hpBarWidth = (portraitWidth - 10) * hpPercent;
+            const hpBar = this.add.rectangle(
+                -(portraitWidth - 10)/2 + hpBarWidth/2, 
+                portraitHeight/2 + UIConfig.hero.manaBar.offset, 
+                hpBarWidth, 
+                UIConfig.hero.manaBar.height, 
+                0xff4444
             );
             
+            // HP text
+            const hpText = this.add.text(0, portraitHeight/2 + UIConfig.hero.manaBar.offset, `${hero.currentHealth}/${hero.maxHealth}`, {
+                fontSize: '30px',   // 20 * 1.5
+                color: '#ffffff',
+                fontFamily: 'Arial',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 3  // 2 * 1.5
+            });
+            hpText.setOrigin(0.5);
+            
             // Add elements to container
-            portraitContainer.add([portraitBg, heroImage, manaBarBg, manaBar]);
+            portraitContainer.add([portraitBg, heroImage, hpBarBg, hpBar, hpText]);
             
             // Make portrait clickable to switch heroes
             portraitBg.setInteractive(new Phaser.Geom.Rectangle(-portraitWidth/2, -portraitHeight/2, portraitWidth, portraitHeight), Phaser.Geom.Rectangle.Contains);
@@ -757,8 +813,8 @@ Hover over cards for preview`;
         this.heroTooltip = this.add.container(tooltipX, tooltipY);
         
         // Tooltip background
-        const tooltipWidth = 320;
-        const tooltipHeight = 150;
+        const tooltipWidth = UIConfig.hero.tooltip.width;
+        const tooltipHeight = UIConfig.hero.tooltip.height;
         const tooltipBg = this.add.graphics();
         tooltipBg.fillStyle(0x000000, 0.9);
         tooltipBg.fillRoundedRect(-tooltipWidth/2, -tooltipHeight/2, tooltipWidth, tooltipHeight, 8);
@@ -766,8 +822,8 @@ Hover over cards for preview`;
         tooltipBg.strokeRoundedRect(-tooltipWidth/2, -tooltipHeight/2, tooltipWidth, tooltipHeight, 8);
         
         // Hero name
-        const nameText = this.add.text(0, -50, hero.name, {
-            fontSize: '18px',
+        const nameText = this.add.text(0, -tooltipHeight/2 + 40, hero.name, {
+            fontSize: `${UIConfig.hero.tooltip.nameSize}px`,
             color: '#ffff00',
             fontFamily: 'Arial',
             fontStyle: 'bold',
@@ -776,13 +832,13 @@ Hover over cards for preview`;
         nameText.setOrigin(0.5);
         
         // Abilities (main focus in new system)
-        let yOffset = -20;
+        let yOffset = -tooltipHeight/2 + 90; // Start below the name with proper spacing
         const tooltipElements = [tooltipBg, nameText];
         
         if (hero.abilities && hero.abilities.length > 0) {
             hero.abilities.forEach(ability => {
                 const abilityText = this.add.text(0, yOffset, ability.description, {
-                    fontSize: '16px',
+                    fontSize: `${UIConfig.hero.tooltip.fontSize}px`,
                     color: '#ff8800',
                     fontFamily: 'Arial',
                     align: 'center',
@@ -790,12 +846,12 @@ Hover over cards for preview`;
                 });
                 abilityText.setOrigin(0.5);
                 tooltipElements.push(abilityText);
-                yOffset += 25;
+                yOffset += 60; // Much more spacing for larger text
             });
         } else {
             // Fallback for heroes without abilities
             const noAbilityText = this.add.text(0, yOffset, 'No special abilities', {
-                fontSize: '14px',
+                fontSize: `${Math.max(UIConfig.hero.tooltip.minFontSize, UIConfig.hero.tooltip.fontSize - 2)}px`,
                 color: '#666666',
                 fontFamily: 'Arial',
                 align: 'center'

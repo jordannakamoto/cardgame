@@ -51,7 +51,8 @@ export default class Analyst extends Hero {
             id: 'analyst',
             name: 'The Analyst',
             type: 'damage',
-            portraitKey: 'analyst'
+            maxHealth: 80,
+            portraitKey: 'mage2'
         });
     }
     
@@ -60,6 +61,7 @@ export default class Analyst extends Hero {
         const tearApplication = new Ability({
             name: 'Tear Analysis',
             description: 'First Spades hand each round applies 1 Tear to all enemies',
+            type: 'utility',
             triggers: [
                 new FirstSpadesTrigger()
             ],
@@ -72,8 +74,9 @@ export default class Analyst extends Hero {
         const tearConsumption = new Ability({
             name: 'Exploit Weakness',
             description: 'Three of a Kind or better consumes all Tears for +15 Mult each',
+            type: 'damage',
             triggers: [
-                new HandTypeTrigger(['THREE_OF_A_KIND', 'STRAIGHT', 'FLUSH', 'FULL_HOUSE', 'FOUR_OF_A_KIND', 'STRAIGHT_FLUSH', 'ROYAL_FLUSH'])
+                new HandTypeTrigger(['Three of a Kind', 'Straight', 'Flush', 'Full House', 'Four of a Kind', 'Straight Flush', 'Royal Flush'])
             ],
             effects: [
                 new ConditionalMultiplierEffect('tears', 1.15),

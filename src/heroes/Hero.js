@@ -11,6 +11,8 @@ export default class Hero {
         // Hero state
         this.currentMana = 0;
         this.maxMana = config.maxMana || 100;
+        this.currentHealth = config.currentHealth || config.maxHealth || 100;
+        this.maxHealth = config.maxHealth || 100;
         this.level = 1;
         this.experience = 0;
         
@@ -78,18 +80,42 @@ export default class Hero {
     }
     
     onHandPlayed(data) {
-        // Override in subclasses
+        // Execute any abilities that should trigger when a hand is played
+        const context = {
+            targetEnemy: data.targetEnemy,
+            selectedCards: data.selectedCards,
+            enemyCount: data.enemyCount,
+            hero: this
+        };
+        
+        // Check each ability to see if it should execute
+        this.abilities.forEach(ability => {
+            if (ability.canActivate && ability.canActivate(data.pokerHand, context, this.state)) {
+                // Execute the ability's effects (not just apply)
+                ability.effects.forEach(effect => {
+                    if (effect.execute) {
+                        effect.execute(context, this.state, ability.triggers);
+                    }
+                });
+            }
+        });
+        
+        // Override in subclasses for additional behavior
     }
     
     // Calculate damage multiplier for a hand
     calculateMultiplier(pokerHand, context = {}) {
         let multiplier = 1.0;
+        this.lastActivatedAbilities = []; // Track which abilities activated
         
         // Let each ability contribute to the multiplier
         this.abilities.forEach(ability => {
             if (ability.canActivate && ability.canActivate(pokerHand, context, this.state)) {
                 const abilityMultiplier = ability.getMultiplier(pokerHand, context, this.state);
                 multiplier *= abilityMultiplier;
+                
+                // Track that this ability activated
+                this.lastActivatedAbilities.push(ability);
                 
                 // Publish the ability activation
                 this.publishMove('abilityActivated', {
@@ -102,6 +128,11 @@ export default class Hero {
         });
         
         return multiplier;
+    }
+    
+    // Check if any abilities activated in the last calculation
+    hasActivatedAbilities() {
+        return this.lastActivatedAbilities && this.lastActivatedAbilities.length > 0;
     }
     
     // Ability system
@@ -135,6 +166,38 @@ export default class Hero {
             return true;
         }
         return false;
+    }
+    
+    // Take damage
+    takeDamage(amount) {
+        const previousHealth = this.currentHealth;
+        this.currentHealth = Math.max(0, this.currentHealth - amount);
+        
+        this.publishMove('damageTaken', {
+            amount,
+            previousHealth,
+            currentHealth: this.currentHealth,
+            isDead: this.currentHealth <= 0
+        });
+        
+        return this.currentHealth <= 0; // Return true if hero died
+    }
+    
+    // Heal
+    heal(amount) {
+        const previousHealth = this.currentHealth;
+        this.currentHealth = Math.min(this.maxHealth, this.currentHealth + amount);
+        
+        this.publishMove('healed', {
+            amount,
+            previousHealth,
+            currentHealth: this.currentHealth
+        });
+    }
+    
+    // Check if hero is alive
+    isAlive() {
+        return this.currentHealth > 0;
     }
     
     // Cleanup when hero is removed
@@ -173,6 +236,7 @@ export class Ability {
         this.name = config.name;
         this.description = config.description;
         this.hero = null; // Set when added to hero
+        this.type = config.type || 'damage'; // 'damage', 'defensive', 'utility', 'resource'
         
         // Component-based system
         this.triggers = config.triggers || []; // Array of trigger components
@@ -265,7 +329,9 @@ export class HandTypeTrigger extends Trigger {
     }
     
     check(pokerHand, context, heroState) {
-        return pokerHand && this.handTypes.includes(pokerHand.handType);
+        if (!pokerHand) return false;
+        // Check against handName (string) - this is what PokerHand actually uses
+        return this.handTypes.includes(pokerHand.handName);
     }
 }
 
