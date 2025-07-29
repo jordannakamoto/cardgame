@@ -1,5 +1,6 @@
 import PokerHand, { HAND_RANKINGS } from '../game/PokerHand.js';
 import Logger from '../logging/Logger.js';
+import { packManager } from '../packs/PackManager.js';
 
 export default class BattleManager {
     constructor(scene) {
@@ -762,6 +763,12 @@ export default class BattleManager {
         // Award the gold
         this.scene.events.emit('goldEarned', totalGoldEarned);
         
+        // Sometimes award a pack as bonus reward (20% chance)
+        const packReward = Math.random() < 0.2;
+        if (packReward) {
+            this.awardPackReward();
+        }
+        
         // Clean up any existing victory handlers first
         if (this.victoryTimeoutId) {
             clearTimeout(this.victoryTimeoutId);
@@ -815,6 +822,52 @@ export default class BattleManager {
         }, 1500);
         
         console.log('Victory screen created with total gold:', totalGoldEarned);
+    }
+    
+    awardPackReward() {
+        console.log('Awarding pack reward!');
+        
+        // Get a battle reward pack
+        const rewardPack = packManager.createBattleRewardPack();
+        
+        // Show pack reward notification
+        const screenWidth = this.scene.cameras.main.width;
+        const packText = this.scene.add.text(
+            screenWidth / 2,
+            this.scene.cameras.main.height / 2 + 100,
+            `Bonus Pack Reward!\n${rewardPack.name}`,
+            {
+                fontSize: '32px',
+                color: '#ffd700',
+                fontFamily: 'Arial',
+                fontStyle: 'bold',
+                align: 'center',
+                stroke: '#000000',
+                strokeThickness: 3
+            }
+        );
+        packText.setOrigin(0.5);
+        
+        // Animate pack reward text
+        this.scene.tweens.add({
+            targets: packText,
+            y: packText.y - 60,
+            alpha: 0,
+            duration: 3000,
+            ease: 'Power2',
+            onComplete: () => packText.destroy()
+        });
+        
+        // Launch pack opening scene after a short delay
+        this.scene.time.delayedCall(2000, () => {
+            this.scene.scene.launch('PackOpeningScene', {
+                pack: rewardPack,
+                inventory: this.scene.inventory,
+                onComplete: (revealedCards) => {
+                    console.log('Battle reward pack opened! Revealed cards:', revealedCards);
+                }
+            });
+        });
     }
     
     onGameOver() {

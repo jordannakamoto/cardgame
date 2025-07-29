@@ -25,6 +25,9 @@ export default class PreloadScene extends Phaser.Scene {
         this.load.image('guardian1', 'heroes/guardian1.png');
         this.load.image('jackpot1', 'heroes/jackpot1.png');
         
+        // Load pack art
+        this.load.image('pack_basic1', 'packs/basic1.png');
+        
         // Load battle backdrop
         this.load.image('battle-backdrop', 'battle/backdrop.png');
         
