@@ -58,7 +58,7 @@ export default class BattleManager {
         
         // Space to get new hand (for testing)
         this.scene.input.keyboard.on('keydown-SPACE', () => {
-            this.drawNewHand();
+            this.drawNewHand(true); // Always animate manual hand draws
         });
         
         // Number keys 1-8 to select/deselect cards
@@ -353,16 +353,21 @@ export default class BattleManager {
         }
     }
     
-    drawNewHand() {
+    drawNewHand(animate = false) {
         if (!this.scene.cardManager) return;
         
         // Keep existing cards and only draw new ones to fill to 8
         const currentHandSize = this.playerHand.length;
         const cardsToDrawCount = 8 - currentHandSize;
         
+        // Track which cards are new before adding them
+        const newCards = [];
         for (let i = 0; i < cardsToDrawCount; i++) {
             const card = this.scene.cardManager.drawCard();
-            if (card) this.playerHand.push(card);
+            if (card) {
+                newCards.push(card);
+                this.playerHand.push(card);
+            }
         }
         
         // Sort the hand after drawing new cards
@@ -370,7 +375,14 @@ export default class BattleManager {
         
         // Clear selection and update display
         this.selectedCards = [];
-        this.scene.events.emit('handChanged', this.playerHand, this.selectedCards);
+        
+        // Use direct call for animation or event for normal updates
+        if (animate) {
+            // Pass the new cards for selective animation
+            this.scene.updateHandDisplay(this.playerHand, this.selectedCards, true, newCards);
+        } else {
+            this.scene.events.emit('handChanged', this.playerHand, this.selectedCards);
+        }
     }
     
     endPlayerTurn() {
@@ -401,7 +413,10 @@ export default class BattleManager {
         
         // Only draw new hand if player has no cards
         if (this.playerHand.length === 0) {
-            this.drawNewHand();
+            // Add a flag to track if this is the initial battle start
+            const isInitialBattle = !this.hasDealtInitialHand;
+            this.hasDealtInitialHand = true;
+            this.drawNewHand(isInitialBattle);
         }
     }
     
@@ -469,54 +484,177 @@ export default class BattleManager {
         // Calculate total gold earned this battle
         const totalGoldEarned = this.enemies.reduce((total, enemy) => total + enemy.goldReward, 0);
         
-        const victoryText = this.scene.add.text(
+        // Semi-transparent background overlay (separate from container)
+        const overlay = this.scene.add.graphics();
+        overlay.fillStyle(0x000000, 0.7);
+        overlay.fillRect(0, 0, this.scene.cameras.main.width, this.scene.cameras.main.height);
+        overlay.setScrollFactor(0);
+        
+        // Create victory panel container
+        const victoryContainer = this.scene.add.container(
             this.scene.cameras.main.centerX,
-            this.scene.cameras.main.centerY - 40,
+            this.scene.cameras.main.centerY
+        );
+        victoryContainer.setScrollFactor(0);
+        
+        // Ornate victory panel background
+        const panelWidth = 600;
+        const panelHeight = 300;
+        const panelBg = this.scene.add.graphics();
+        
+        // Gradient background
+        panelBg.fillGradientStyle(0x2a1810, 0x2a1810, 0x1a0f08, 0x1a0f08, 1);
+        panelBg.fillRoundedRect(-panelWidth/2, -panelHeight/2, panelWidth, panelHeight, 20);
+        
+        // Golden border
+        panelBg.lineStyle(6, 0xd4af37, 1.0);
+        panelBg.strokeRoundedRect(-panelWidth/2, -panelHeight/2, panelWidth, panelHeight, 20);
+        
+        // Inner border
+        panelBg.lineStyle(3, 0x8b4513, 0.8);
+        panelBg.strokeRoundedRect(-panelWidth/2 + 8, -panelHeight/2 + 8, panelWidth - 16, panelHeight - 16, 15);
+        
+        // Victory text with golden styling
+        const victoryText = this.scene.add.text(
+            0,
+            -60,
             'VICTORY!',
             {
-                fontSize: '96px',
-                color: '#00ff00',
+                fontSize: '84px',
+                color: '#d4af37',
                 fontFamily: 'Arial',
-                fontStyle: 'bold'
+                fontStyle: 'bold',
+                stroke: '#8b4513',
+                strokeThickness: 4
             }
         );
         victoryText.setOrigin(0.5);
         
-        // Show total gold earned
+        // Gold earned with coin symbol (starts at 0 for counting animation)
         const goldText = this.scene.add.text(
-            this.scene.cameras.main.centerX,
-            this.scene.cameras.main.centerY + 40,
-            `+${totalGoldEarned} gold earned!`,
+            0,
+            20,
+            `🪙 +0`,
             {
                 fontSize: '48px',
-                color: '#ffdd00',
+                color: '#ffd700',
                 fontFamily: 'Arial',
-                fontStyle: 'bold'
+                fontStyle: 'bold',
+                stroke: '#8b4513',
+                strokeThickness: 3
             }
         );
         goldText.setOrigin(0.5);
         
+        // Count up animation for gold
+        let currentGold = 0;
+        const goldCountTween = this.scene.tweens.addCounter({
+            from: 0,
+            to: totalGoldEarned,
+            duration: 1500,
+            delay: 500, // Start after panel slides in
+            ease: 'Power2',
+            onUpdate: (tween) => {
+                const value = Math.floor(tween.getValue());
+                if (value !== currentGold) {
+                    currentGold = value;
+                    goldText.setText(`🪙 +${currentGold}`);
+                    
+                    // Add a little bounce effect when counting
+                    goldText.setScale(1.1);
+                    this.scene.tweens.add({
+                        targets: goldText,
+                        scaleX: 1.0,
+                        scaleY: 1.0,
+                        duration: 100,
+                        ease: 'Back.out'
+                    });
+                }
+            },
+            onComplete: () => {
+                // Final bounce when counting is done
+                this.scene.tweens.add({
+                    targets: goldText,
+                    scaleX: 1.2,
+                    scaleY: 1.2,
+                    duration: 200,
+                    yoyo: true,
+                    ease: 'Back.out'
+                });
+            }
+        });
+        
+        // Continue prompt
+        const continueText = this.scene.add.text(
+            0,
+            80,
+            'Press any key to continue...',
+            {
+                fontSize: '24px',
+                color: '#cccccc',
+                fontFamily: 'Arial',
+                fontStyle: 'italic'
+            }
+        );
+        continueText.setOrigin(0.5);
+        
+        // Add elements to container (overlay is separate)
+        victoryContainer.add([panelBg, victoryText, goldText, continueText]);
+        
         // Award the gold
         this.scene.events.emit('goldEarned', totalGoldEarned);
         
-        // Celebrate animation
+        // Entrance animation - slide in from top
+        victoryContainer.y = -this.scene.cameras.main.height;
         this.scene.tweens.add({
-            targets: victoryText,
-            scaleX: 1.2,
-            scaleY: 1.2,
-            duration: 500,
-            yoyo: true,
-            repeat: -1
+            targets: victoryContainer,
+            y: this.scene.cameras.main.centerY,
+            duration: 800,
+            ease: 'Back.out'
         });
         
-        // Transition to shop after delay
-        this.scene.time.delayedCall(3000, () => {
+        // Gentle pulsing animation for victory text
+        this.scene.tweens.add({
+            targets: victoryText,
+            scaleX: { from: 1.0, to: 1.1 },
+            scaleY: { from: 1.0, to: 1.1 },
+            duration: 1000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+        
+        // Pulsing continue text
+        this.scene.tweens.add({
+            targets: continueText,
+            alpha: { from: 1.0, to: 0.4 },
+            duration: 1200,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+        
+        // Transition to shop after delay or any key press
+        const continueHandler = () => {
+            console.log('Victory screen continuing to shop...');
             this.scene.scene.start('ShopScene', {
                 gold: this.scene.inventory.getResource('gold'),
                 inventory: this.scene.inventory,
                 partyManager: this.scene.partyManager
             });
-        });
+        };
+        
+        // Auto-continue after 5 seconds
+        this.scene.time.delayedCall(5000, continueHandler);
+        
+        // Manual continue with any key
+        this.scene.input.keyboard.once('keydown', continueHandler);
+        
+        // Manual continue with click on overlay
+        overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, this.scene.cameras.main.width, this.scene.cameras.main.height), Phaser.Geom.Rectangle.Contains);
+        overlay.once('pointerdown', continueHandler);
+        
+        console.log('Victory screen created with total gold:', totalGoldEarned);
     }
     
     getAliveEnemies() {

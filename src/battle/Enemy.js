@@ -21,6 +21,12 @@ export default class Enemy {
         this.nameText = null;
         this.targetIndicator = null;
         this.damagePreview = null;
+        this.targetGlow = null;
+        this.targetOutline = null;
+        this.targetParticles = [];
+        this.targetScaleTween = null;
+        this.targetArrow = null;
+        this.targetOrb = null;
         
         this.createVisuals();
     }
@@ -48,6 +54,12 @@ export default class Enemy {
             this.createFallbackSprite();
         }
         
+        // Store original position and scale immediately after sprite creation
+        if (this.sprite) {
+            this.originalScaleX = this.sprite.scaleX;
+            this.originalScaleY = this.sprite.scaleY;
+        }
+        
         this.createUI();
         this.startIdleAnimation();
     }
@@ -65,13 +77,14 @@ export default class Enemy {
     }
     
     createUI() {
-        // Enemy name
-        this.nameText = this.scene.add.text(this.x, this.y - 210, this.name, {  // 140 * 1.5
-            fontSize: '42px',  // 28 * 1.5
-            color: '#ffffff',
-            fontFamily: 'Arial'
-        });
-        this.nameText.setOrigin(0.5);
+        // Enemy name (removed for cleaner look)
+        // this.nameText = this.scene.add.text(this.x, this.y - 210, this.name, {  // 140 * 1.5
+        //     fontSize: '42px',  // 28 * 1.5
+        //     color: '#ffffff',
+        //     fontFamily: 'Arial'
+        // });
+        // this.nameText.setOrigin(0.5);
+        this.nameText = null;
         
         // Health bar background
         this.healthBarBg = this.scene.add.rectangle(this.x, this.y + 210, 240, 24, 0x444444);  // 140 * 1.5, 160 * 1.5, 16 * 1.5
@@ -169,8 +182,11 @@ export default class Enemy {
         this.scene.tweens.killTweensOf(this.sprite);
         
         // Death animation - gentle fade out
+        const fadeTargets = [this.sprite, this.healthBar, this.healthBarBg];
+        if (this.nameText) fadeTargets.push(this.nameText);
+        
         this.scene.tweens.add({
-            targets: [this.sprite, this.healthBar, this.healthBarBg, this.nameText],
+            targets: fadeTargets,
             alpha: 0,
             duration: 1000,  // Slower, more gentle
             ease: 'Linear',  // Smooth, even fade
@@ -190,13 +206,220 @@ export default class Enemy {
     
     setTargeted(targeted) {
         this.isTargeted = targeted;
-        this.targetIndicator.setVisible(targeted);
         
-        // Hide damage preview when not targeted
-        if (!targeted) {
+        if (targeted) {
+            this.showTargetEffects();
+        } else {
+            this.hideTargetEffects();
             this.hideDamagePreview();
         }
     }
+    
+    showTargetEffects() {
+        // Clear any existing target effects
+        this.hideTargetEffects();
+        
+        // 1. Create floating down arrow above the enemy (elegant ornate style)
+        this.targetArrow = this.scene.add.graphics();
+        
+        const arrowSize = 32; // Slightly smaller
+        const arrowX = this.x;
+        const arrowY = this.y - 280; // Lowered position
+        
+        // Draw left (shadow) side of the arrow - darker silver with FF elegance
+        this.targetArrow.fillStyle(0x9090a0, 0.95); // Darker silver for shadow side
+        this.targetArrow.lineStyle(2, 0x606070, 1.0); // Dark silver outline
+        
+        this.targetArrow.beginPath();
+        // Sharp elongated point (bottom center)
+        this.targetArrow.moveTo(arrowX, arrowY + arrowSize * 1.1);
+        // Left wing - more angular and diamond-like
+        this.targetArrow.lineTo(arrowX - arrowSize * 0.8, arrowY + arrowSize * 0.2);
+        this.targetArrow.lineTo(arrowX - arrowSize * 0.5, arrowY + arrowSize * 0.05); // Angular cut
+        this.targetArrow.lineTo(arrowX - arrowSize * 0.35, arrowY + arrowSize * 0.15);
+        // Elegant curved transition to shaft
+        this.targetArrow.lineTo(arrowX - arrowSize * 0.25, arrowY - arrowSize * 0.1);
+        // Long slender shaft
+        this.targetArrow.lineTo(arrowX - arrowSize * 0.15, arrowY - arrowSize * 0.6);
+        // Ornate nock with curves
+        this.targetArrow.lineTo(arrowX - arrowSize * 0.08, arrowY - arrowSize * 0.8);
+        this.targetArrow.lineTo(arrowX, arrowY - arrowSize * 0.75);
+        // Center line back down
+        this.targetArrow.lineTo(arrowX, arrowY + arrowSize * 1.1);
+        this.targetArrow.closePath();
+        this.targetArrow.fillPath();
+        this.targetArrow.strokePath();
+        
+        // Draw right (highlight) side of the arrow - brighter silver with FF elegance
+        this.targetArrow.fillStyle(0xd0d0e0, 0.95); // Bright silver for lit side
+        this.targetArrow.lineStyle(2, 0x606070, 1.0); // Dark silver outline
+        
+        this.targetArrow.beginPath();
+        // Sharp elongated point (bottom center)
+        this.targetArrow.moveTo(arrowX, arrowY + arrowSize * 1.1);
+        // Right wing - more angular and diamond-like
+        this.targetArrow.lineTo(arrowX + arrowSize * 0.8, arrowY + arrowSize * 0.2);
+        this.targetArrow.lineTo(arrowX + arrowSize * 0.5, arrowY + arrowSize * 0.05); // Angular cut
+        this.targetArrow.lineTo(arrowX + arrowSize * 0.35, arrowY + arrowSize * 0.15);
+        // Elegant curved transition to shaft
+        this.targetArrow.lineTo(arrowX + arrowSize * 0.25, arrowY - arrowSize * 0.1);
+        // Long slender shaft
+        this.targetArrow.lineTo(arrowX + arrowSize * 0.15, arrowY - arrowSize * 0.6);
+        // Ornate nock with curves
+        this.targetArrow.lineTo(arrowX + arrowSize * 0.08, arrowY - arrowSize * 0.8);
+        this.targetArrow.lineTo(arrowX, arrowY - arrowSize * 0.75);
+        // Center line back down
+        this.targetArrow.lineTo(arrowX, arrowY + arrowSize * 1.1);
+        this.targetArrow.closePath();
+        this.targetArrow.fillPath();
+        this.targetArrow.strokePath();
+        
+        // Add extra highlight on the right side for more depth
+        this.targetArrow.fillStyle(0xf0f0ff, 0.7); // Light silver highlight
+        this.targetArrow.beginPath();
+        this.targetArrow.moveTo(arrowX, arrowY + arrowSize * 1.0);
+        this.targetArrow.lineTo(arrowX + arrowSize * 0.5, arrowY + arrowSize * 0.2);
+        this.targetArrow.lineTo(arrowX + arrowSize * 0.2, arrowY + arrowSize * 0.15);
+        this.targetArrow.lineTo(arrowX + arrowSize * 0.1, arrowY - arrowSize * 0.2);
+        this.targetArrow.lineTo(arrowX, arrowY - arrowSize * 0.3);
+        this.targetArrow.closePath();
+        this.targetArrow.fillPath();
+        
+        // Add ornate decorative elements - Final Fantasy style
+        this.targetArrow.lineStyle(1, 0xe0e0ff, 0.8); // Bright silver details
+        // Central line down the elongated shaft
+        this.targetArrow.beginPath();
+        this.targetArrow.moveTo(arrowX, arrowY + arrowSize * 0.9);
+        this.targetArrow.lineTo(arrowX, arrowY - arrowSize * 0.3);
+        this.targetArrow.strokePath();
+        
+        // Elegant decorative fletching with FF-style curves
+        this.targetArrow.lineStyle(1, 0x8080a0, 0.7);
+        // Multiple curved fletching lines for ornate look
+        for (let i = -1; i <= 1; i += 2) {
+            // Upper fletching curves
+            this.targetArrow.beginPath();
+            this.targetArrow.moveTo(arrowX + i * 4, arrowY - arrowSize * 0.7);
+            this.targetArrow.lineTo(arrowX + i * 8, arrowY - arrowSize * 0.8);
+            this.targetArrow.strokePath();
+            
+            // Lower fletching curves
+            this.targetArrow.beginPath();
+            this.targetArrow.moveTo(arrowX + i * 3, arrowY - arrowSize * 0.6);
+            this.targetArrow.lineTo(arrowX + i * 6, arrowY - arrowSize * 0.65);
+            this.targetArrow.strokePath();
+        }
+        
+        // Add diamond/star-like ornamental details along the shaft
+        this.targetArrow.fillStyle(0xe0e0ff, 0.9);
+        for (let i = 0; i < 3; i++) {
+            const gemY = arrowY - arrowSize * (0.2 + i * 0.15);
+            // Draw small diamond/star shapes instead of circles
+            this.targetArrow.beginPath();
+            this.targetArrow.moveTo(arrowX, gemY - 2); // Top point
+            this.targetArrow.lineTo(arrowX + 1.5, gemY); // Right point
+            this.targetArrow.lineTo(arrowX, gemY + 2); // Bottom point
+            this.targetArrow.lineTo(arrowX - 1.5, gemY); // Left point
+            this.targetArrow.closePath();
+            this.targetArrow.fillPath();
+        }
+        
+        // Add blue glow effect manually with multiple layers
+        this.targetGlow = this.scene.add.graphics();
+        
+        // Large background glow centered on arrow body
+        this.targetGlow.fillStyle(0x4da6ff, 0.1); // Outer blue glow - reduced opacity
+        this.targetGlow.fillCircle(arrowX, arrowY, arrowSize * 1.4); // Large glow circle around arrow body
+        
+        this.targetGlow.fillStyle(0x87ceeb, 0.15); // Medium blue glow - reduced opacity
+        this.targetGlow.fillCircle(arrowX, arrowY, arrowSize * 1.1); // Medium glow circle
+        
+        // Focused glow at the arrow center (vertical middle)
+        const arrowCenterY = arrowY + arrowSize * 0.1; // Arrow center location
+        this.targetGlow.fillStyle(0xb0e0e6, 0.15); // Much more subtle inner glow at the center
+        this.targetGlow.fillCircle(arrowX, arrowCenterY, arrowSize * 0.4); // Small focused glow at arrow center
+        
+        this.targetGlow.setScrollFactor(0);
+        
+        // Create a magical orb of light at the arrow center (very subtle)
+        this.targetOrb = this.scene.add.graphics();
+        const orbY = arrowY + arrowSize * 0.1; // Position at arrow center (vertical middle)
+        
+        // Outer orb glow
+        this.targetOrb.fillStyle(0x4da6ff, 0.08); // Much more transparent
+        this.targetOrb.fillCircle(arrowX, orbY, 12); // Smaller outer glow
+        
+        this.targetOrb.fillStyle(0x87ceeb, 0.15); // Much more transparent
+        this.targetOrb.fillCircle(arrowX, orbY, 6); // Smaller main orb
+        
+        this.targetOrb.fillStyle(0xb0e0e6, 0.12); // Much more transparent
+        this.targetOrb.fillCircle(arrowX, orbY, 9); // Smaller medium glow
+        
+        this.targetOrb.fillStyle(0xffffff, 0.25); // Much more transparent white center
+        this.targetOrb.fillCircle(arrowX, orbY, 2); // Smaller bright core
+        
+        this.targetArrow.setScrollFactor(0); // Keep fixed to camera
+        this.targetOrb.setScrollFactor(0); // Keep orb fixed to camera too
+        
+        // Add floating animation (slightly faster and more movement)
+        this.scene.tweens.add({
+            targets: [this.targetArrow, this.targetOrb, this.targetGlow],
+            y: arrowY - 6, // More movement
+            duration: 1800, // Faster animation
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+        
+        // Add very gentle pulsing animation to the orb and glow
+        this.scene.tweens.add({
+            targets: [this.targetOrb, this.targetGlow],
+            alpha: 0.2, // More subtle pulsing
+            duration: 1200, // Slower pulsing
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+        
+        // 2. Very subtle camera effects
+        this.scene.cameras.main.zoomTo(1.02, 300);
+        
+        // Barely noticeable pan - just shift 0.5% toward the enemy
+        const currentCenterX = this.scene.cameras.main.width / 2;
+        const currentCenterY = this.scene.cameras.main.height / 2;
+        const panX = currentCenterX + (this.x - currentCenterX) * 0.005;
+        const panY = currentCenterY + (this.y - currentCenterY) * 0.005;
+        this.scene.cameras.main.pan(panX, panY, 300);
+    }
+    
+    hideTargetEffects() {
+        // Remove floating arrow, orb, and glow
+        if (this.targetArrow) {
+            this.scene.tweens.killTweensOf(this.targetArrow);
+            this.targetArrow.destroy();
+            this.targetArrow = null;
+        }
+        
+        if (this.targetOrb) {
+            this.scene.tweens.killTweensOf(this.targetOrb);
+            this.targetOrb.destroy();
+            this.targetOrb = null;
+        }
+        
+        if (this.targetGlow) {
+            this.scene.tweens.killTweensOf(this.targetGlow);
+            this.targetGlow.destroy();
+            this.targetGlow = null;
+        }
+        
+        // Reset camera
+        this.scene.cameras.main.zoomTo(1.0, 400);
+        this.scene.cameras.main.centerOn(this.scene.cameras.main.width / 2, this.scene.cameras.main.height / 2);
+        
+        // Hide old target indicator
+        this.targetIndicator.setVisible(false);
+    }
+    
     
     showDamagePreview(damage) {
         if (!this.isAlive) return;
@@ -281,6 +504,9 @@ export default class Enemy {
     }
     
     destroy() {
+        // Clean up target effects first
+        this.hideTargetEffects();
+        
         if (this.sprite) this.sprite.destroy();
         if (this.healthBar) this.healthBar.destroy();
         if (this.healthBarBg) this.healthBarBg.destroy();
@@ -294,8 +520,18 @@ export default class Enemy {
     }
     
     makeInteractive() {
-        // Make the sprite clickable for targeting
-        this.sprite.setInteractive();
+        // Make the sprite clickable for targeting with pixel-perfect detection
+        if (this.isImageSprite) {
+            // For image sprites, use pixel-perfect hit area
+            this.sprite.setInteractive({ 
+                pixelPerfect: true,
+                alphaTolerance: 1 // Only pixels with alpha > 1 are clickable
+            });
+        } else {
+            // For fallback rectangles, use normal rectangular hit area
+            this.sprite.setInteractive();
+        }
+        
         this.sprite.on('pointerdown', () => {
             if (this.isAlive && this.scene.battleManager) {
                 // Find this enemy's index in the battle manager's enemy array

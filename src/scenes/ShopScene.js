@@ -24,188 +24,221 @@ export default class ShopScene extends Phaser.Scene {
         const screenWidth = this.cameras.main.width;
         const screenHeight = this.cameras.main.height;
 
-        // Background
-        this.add.rectangle(screenWidth / 2, screenHeight / 2, screenWidth, screenHeight, 0x1a1a2e);
+        // Rich gradient background like Balatro
+        this.createBackground();
 
-        // Shop title
+        // Shop title with ornate styling
         this.titleText = this.add.text(
             screenWidth / 2,
-            100,
-            'SHOP',
+            120,
+            'MERCHANT\'S SANCTUM',
             {
-                fontSize: '72px',
-                color: '#ffffff',
+                fontSize: '84px',
+                color: '#d4af37',
                 fontFamily: 'Arial',
-                fontStyle: 'bold'
+                fontStyle: 'bold',
+                stroke: '#8b4513',
+                strokeThickness: 4
             }
         );
         this.titleText.setOrigin(0.5);
 
-        // Gold display
-        this.goldDisplay = this.add.text(
-            100,
-            100,
-            `Gold: ${this.playerGold}`,
-            {
-                fontSize: '36px',
-                color: '#ffdd00',
-                fontFamily: 'Arial',
-                fontStyle: 'bold'
-            }
-        );
-        this.goldDisplay.setOrigin(0, 0.5);
+        // Gold display with ornate frame
+        this.createGoldDisplay();
 
-        // Initialize shop state FIRST
-        this.currentShopTab = 'items'; // 'items' or 'heroes'
+        // Generate limited shop inventory
+        this.generateShopInventory();
         
-        // Shop sections
-        this.createShopTabs();
-        this.createShopItems();
+        // Create shop display
+        this.createShopDisplay();
 
         // Continue button
         this.createContinueButton();
 
         // Setup input
         this.setupInput();
-        
-        // Update tab appearance to match initial state
-        this.itemsTab.setFillStyle(0x66BB6A);
-        this.heroesTab.setFillStyle(0x2196F3);
     }
     
-    createShopTabs() {
+    createBackground() {
         const screenWidth = this.cameras.main.width;
+        const screenHeight = this.cameras.main.height;
         
-        // Items tab
-        this.itemsTab = this.add.rectangle(screenWidth / 2 - 150, 200, 200, 50, 0x4CAF50);
-        this.itemsTab.setStrokeStyle(2, 0x66BB6A);
-        const itemsTabText = this.add.text(screenWidth / 2 - 150, 200, 'ITEMS', {
-            fontSize: '24px',
-            color: '#ffffff',
-            fontFamily: 'Arial',
-            fontStyle: 'bold'
-        });
-        itemsTabText.setOrigin(0.5);
+        // Rich gradient background
+        const bg = this.add.graphics();
+        bg.fillGradientStyle(0x2a1810, 0x2a1810, 0x1a0f08, 0x1a0f08, 1);
+        bg.fillRect(0, 0, screenWidth, screenHeight);
         
-        // Heroes tab
-        this.heroesTab = this.add.rectangle(screenWidth / 2 + 150, 200, 200, 50, 0x2196F3);
-        this.heroesTab.setStrokeStyle(2, 0x42A5F5);
-        const heroesTabText = this.add.text(screenWidth / 2 + 150, 200, 'HEROES', {
-            fontSize: '24px',
-            color: '#ffffff',
-            fontFamily: 'Arial',
-            fontStyle: 'bold'
-        });
-        heroesTabText.setOrigin(0.5);
+        // Add subtle texture with multiple overlays
+        const overlay1 = this.add.graphics();
+        overlay1.fillStyle(0x3a2820, 0.3);
+        overlay1.fillRect(0, 0, screenWidth, screenHeight);
         
-        // Make tabs interactive
-        this.itemsTab.setInteractive();
-        this.itemsTab.on('pointerdown', (pointer, localX, localY, event) => {
-            console.log('Items tab clicked');
-            if (event) event.stopPropagation();
-            this.switchTab('items');
-        });
-        this.itemsTab.on('pointerover', () => this.itemsTab.setFillStyle(0x66BB6A));
-        this.itemsTab.on('pointerout', () => this.itemsTab.setFillStyle(this.currentShopTab === 'items' ? 0x66BB6A : 0x4CAF50));
+        // Add ornate border
+        const border = this.add.graphics();
+        border.lineStyle(8, 0xd4af37, 0.6);
+        border.strokeRoundedRect(20, 20, screenWidth - 40, screenHeight - 40, 20);
         
-        this.heroesTab.setInteractive();
-        this.heroesTab.on('pointerdown', (pointer, localX, localY, event) => {
-            console.log('Heroes tab clicked');
-            if (event) event.stopPropagation();
-            this.switchTab('heroes');
-        });
-        this.heroesTab.on('pointerover', () => this.heroesTab.setFillStyle(0x42A5F5));
-        this.heroesTab.on('pointerout', () => this.heroesTab.setFillStyle(this.currentShopTab === 'heroes' ? 0x42A5F5 : 0x2196F3));
+        border.lineStyle(4, 0x8b4513, 0.4);
+        border.strokeRoundedRect(30, 30, screenWidth - 60, screenHeight - 60, 15);
     }
     
-    switchTab(tabName) {
-        console.log('Tab switch requested:', this.currentShopTab, '->', tabName);
-        console.trace('Tab switch call stack');
+    createGoldDisplay() {
+        const screenWidth = this.cameras.main.width;
         
-        this.currentShopTab = tabName;
+        // Ornate gold frame
+        const goldFrame = this.add.graphics();
+        goldFrame.fillStyle(0x8b4513, 0.8);
+        goldFrame.fillRoundedRect(80, 60, 280, 80, 12);
+        goldFrame.lineStyle(4, 0xd4af37, 1.0);
+        goldFrame.strokeRoundedRect(80, 60, 280, 80, 12);
         
-        // Update tab appearance
-        this.itemsTab.setFillStyle(tabName === 'items' ? 0x66BB6A : 0x4CAF50);
-        this.heroesTab.setFillStyle(tabName === 'heroes' ? 0x42A5F5 : 0x2196F3);
+        // Inner glow
+        goldFrame.lineStyle(2, 0xffd700, 0.6);
+        goldFrame.strokeRoundedRect(86, 66, 268, 68, 9);
         
-        // Refresh shop display
-        this.refreshShopDisplay();
+        this.goldDisplay = this.add.text(
+            220,
+            100,
+            `${this.playerGold}`,
+            {
+                fontSize: '48px',
+                color: '#ffd700',
+                fontFamily: 'Arial',
+                fontStyle: 'bold',
+                stroke: '#8b4513',
+                strokeThickness: 3
+            }
+        );
+        this.goldDisplay.setOrigin(0.5);
+        
+        // Gold coin icon
+        const coinIcon = this.add.text(
+            140,
+            100,
+            '🪙',
+            {
+                fontSize: '36px'
+            }
+        );
+        coinIcon.setOrigin(0.5);
     }
 
-    createShopItems() {
-        const screenWidth = this.cameras.main.width;
-        const startY = 300;
-        const itemSpacing = 150;
-
-        // Define shop items (testing prices - much lower)
-        this.itemShopItems = [
+    generateShopInventory() {
+        // Define all possible items
+        const allItems = [
             {
                 name: 'Health Potion',
-                description: 'Restore 50 health',
-                price: 2,
+                description: 'Restore 50 health to active hero',
+                price: 8,
                 type: 'consumable',
+                rarity: 'common',
                 effect: { type: 'heal', value: 50 }
             },
             {
                 name: 'Power Ring',
-                description: '+5 damage to all hands',
-                price: 5,
+                description: '+5 damage to all poker hands',
+                price: 15,
                 type: 'equipment',
+                rarity: 'uncommon',
                 effect: { type: 'damage_boost', value: 5 }
             },
             {
                 name: 'Lucky Charm',
                 description: 'Pairs deal +10 bonus damage',
-                price: 3,
+                price: 12,
                 type: 'equipment',
+                rarity: 'uncommon',
                 effect: { type: 'pair_bonus', value: 10 }
             },
             {
-                name: 'Mana Crystal',
-                description: 'Start battles with +20 mana',
-                price: 4,
+                name: 'Arcane Crystal',
+                description: 'All heroes gain +1 ability activation',
+                price: 25,
                 type: 'equipment',
-                effect: { type: 'mana_boost', value: 20 }
+                rarity: 'rare',
+                effect: { type: 'ability_boost', value: 1 }
             },
             {
-                name: 'Card Pack',
-                description: 'Add random card to deck',
-                price: 3,
+                name: 'Golden Deck',
+                description: 'Face cards deal +3 extra damage',
+                price: 18,
                 type: 'deck_modifier',
-                effect: { type: 'add_card', value: 1 }
+                rarity: 'uncommon',
+                effect: { type: 'face_card_bonus', value: 3 }
+            },
+            {
+                name: 'Merchant\'s Blessing',
+                description: 'Gain +50% gold from battles',
+                price: 30,
+                type: 'equipment',
+                rarity: 'rare',
+                effect: { type: 'gold_multiplier', value: 1.5 }
             }
         ];
         
-        // Get hero shop items
+        // Get available heroes
         const allHeroData = getAllHeroShopData();
-        console.log('All hero data:', allHeroData.length, allHeroData);
-        this.heroShopItems = allHeroData.map(heroData => ({
+        const availableHeroes = allHeroData.filter(heroData => 
+            !this.partyManager || !this.partyManager.ownsHero(heroData.id)
+        ).map(heroData => ({
             ...heroData,
             category: 'hero'
         }));
-        console.log('Hero shop items:', this.heroShopItems.length);
-
-        // Create item displays
-        this.itemContainers = [];
-        this.displayCurrentShopItems();
+        
+        // Combine all purchaseables
+        const allPurchaseables = [...allItems, ...availableHeroes];
+        
+        // Randomly select 6 items for the shop (Balatro-style limited selection)
+        this.shopInventory = [];
+        const shuffled = [...allPurchaseables].sort(() => Math.random() - 0.5);
+        
+        // Take first 6 items (2 heroes max)
+        let heroCount = 0;
+        for (const item of shuffled) {
+            if (this.shopInventory.length >= 6) break;
+            if (item.category === 'hero' && heroCount >= 2) continue;
+            
+            this.shopInventory.push(item);
+            if (item.category === 'hero') heroCount++;
+        }
+        
+        console.log('Generated shop inventory:', this.shopInventory.length, 'items');
     }
     
-    displayCurrentShopItems() {
+    createShopDisplay() {
         const screenWidth = this.cameras.main.width;
         const startY = 350;
-        const itemsPerRow = 4;
-        const cardSpacing = 220;
-        const rowSpacing = 320;
+        const itemsPerRow = 3;
+        const cardSpacing = 280;
+        const rowSpacing = 380;
         
-        const currentItems = this.currentShopTab === 'items' ? this.itemShopItems : this.heroShopItems;
+        // Create shop title section
+        const shopLabel = this.add.text(
+            screenWidth / 2,
+            220,
+            'AVAILABLE WARES',
+            {
+                fontSize: '42px',
+                color: '#d4af37',
+                fontFamily: 'Arial',
+                fontStyle: 'bold',
+                stroke: '#8b4513',
+                strokeThickness: 2
+            }
+        );
+        shopLabel.setOrigin(0.5);
         
-        currentItems.forEach((item, index) => {
+        this.itemContainers = [];
+        
+        this.shopInventory.forEach((item, index) => {
             const row = Math.floor(index / itemsPerRow);
             const col = index % itemsPerRow;
             
-            // Calculate position for grid layout
-            const totalRowWidth = (itemsPerRow - 1) * cardSpacing;
-            const startX = (screenWidth - totalRowWidth) / 2;
+            // Calculate position for centered grid layout
+            const totalRowWidth = Math.min(this.shopInventory.length, itemsPerRow) * cardSpacing - cardSpacing;
+            const rowItemCount = Math.min(this.shopInventory.length - row * itemsPerRow, itemsPerRow);
+            const rowWidth = (rowItemCount - 1) * cardSpacing;
+            const startX = (screenWidth - rowWidth) / 2;
             const itemX = startX + (col * cardSpacing);
             const itemY = startY + (row * rowSpacing);
             
@@ -218,67 +251,96 @@ export default class ShopScene extends Phaser.Scene {
         const container = this.add.container(x, y);
         const canAfford = this.playerGold >= item.price;
 
-        // Card-style background
-        const cardWidth = 200;
-        const cardHeight = 280;
+        // Larger Balatro-style card
+        const cardWidth = 240;
+        const cardHeight = 320;
         const itemBg = this.add.graphics();
         
-        // Main card background
-        itemBg.fillStyle(canAfford ? 0x2a2a2a : 0x1a1a1a);
-        itemBg.fillRoundedRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight, 12);
-        itemBg.lineStyle(3, canAfford ? 0x555555 : 0x333333);
-        itemBg.strokeRoundedRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight, 12);
-
-        // Price tag at top
-        const priceTag = this.add.graphics();
-        priceTag.fillStyle(0x1a1a2e);
-        priceTag.fillRoundedRect(-30, -cardHeight/2 - 10, 60, 30, 8);
-        priceTag.lineStyle(2, canAfford ? 0xffdd00 : 0xaa8800);
-        priceTag.strokeRoundedRect(-30, -cardHeight/2 - 10, 60, 30, 8);
+        // Rich card background with gradient
+        if (canAfford) {
+            itemBg.fillGradientStyle(0x3a2f28, 0x3a2f28, 0x2a1f18, 0x2a1f18, 1);
+        } else {
+            itemBg.fillGradientStyle(0x2a1f18, 0x2a1f18, 0x1a0f08, 0x1a0f08, 1);
+        }
+        itemBg.fillRoundedRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight, 16);
         
-        const priceText = this.add.text(0, -cardHeight/2 + 5, `$${item.price}`, {
-            fontSize: '18px',
-            color: canAfford ? '#ffdd00' : '#aa8800',
+        // Ornate border based on rarity
+        const rarityColor = item.rarity ? this.getRarityColor(item.rarity) : 0x8b4513;
+        itemBg.lineStyle(4, canAfford ? rarityColor : 0x444444, canAfford ? 1.0 : 0.5);
+        itemBg.strokeRoundedRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight, 16);
+        
+        // Inner glow for affordable items
+        if (canAfford) {
+            itemBg.lineStyle(2, rarityColor, 0.4);
+            itemBg.strokeRoundedRect(-cardWidth/2 + 4, -cardHeight/2 + 4, cardWidth - 8, cardHeight - 8, 12);
+        }
+
+        // Price display - more prominent
+        const priceContainer = this.add.container(0, -cardHeight/2 + 25);
+        const priceBg = this.add.graphics();
+        priceBg.fillStyle(0x8b4513, 0.9);
+        priceBg.fillRoundedRect(-40, -15, 80, 30, 15);
+        priceBg.lineStyle(3, canAfford ? 0xffd700 : 0x666666, 1.0);
+        priceBg.strokeRoundedRect(-40, -15, 80, 30, 15);
+        
+        const priceText = this.add.text(0, 0, `${item.price}`, {
+            fontSize: '24px',
+            color: canAfford ? '#ffd700' : '#666666',
             fontFamily: 'Arial',
             fontStyle: 'bold'
         });
         priceText.setOrigin(0.5);
+        
+        // Coin icon
+        const coinIcon = this.add.text(-25, 0, '🪙', {
+            fontSize: '16px'
+        });
+        coinIcon.setOrigin(0.5);
+        
+        priceContainer.add([priceBg, coinIcon, priceText]);
 
-        // Item visual representation
+        // Rarity banner
+        if (item.rarity) {
+            const rarityBanner = this.add.graphics();
+            rarityBanner.fillStyle(rarityColor, 0.8);
+            rarityBanner.fillRoundedRect(-cardWidth/2, -cardHeight/2 + 50, cardWidth, 30, 8);
+            
+            const rarityText = this.add.text(0, -cardHeight/2 + 65, item.rarity.toUpperCase(), {
+                fontSize: '14px',
+                color: '#ffffff',
+                fontFamily: 'Arial',
+                fontStyle: 'bold'
+            });
+            rarityText.setOrigin(0.5);
+            container.add([rarityBanner, rarityText]);
+        }
+
+        // Item visual representation (larger)
         const itemVisual = this.createItemVisual(item, canAfford);
 
-        // Item name at bottom
-        const nameText = this.add.text(0, cardHeight/2 - 40, item.name, {
-            fontSize: '16px',
-            color: canAfford ? '#ffffff' : '#666666',
+        // Item name
+        const nameText = this.add.text(0, cardHeight/2 - 60, item.name, {
+            fontSize: '18px',
+            color: canAfford ? '#d4af37' : '#666666',
             fontFamily: 'Arial',
             fontStyle: 'bold',
             align: 'center',
             wordWrap: { width: cardWidth - 20 }
         });
         nameText.setOrigin(0.5);
-
-        // Rarity indicator (for heroes)
-        if (item.rarity) {
-            const rarityColor = this.getRarityColor(item.rarity);
-            const rarityBg = this.add.graphics();
-            rarityBg.fillStyle(rarityColor, 0.3);
-            rarityBg.fillRoundedRect(-cardWidth/2 + 5, -cardHeight/2 + 5, cardWidth - 10, 25, 6);
-            rarityBg.lineStyle(2, rarityColor);
-            rarityBg.strokeRoundedRect(-cardWidth/2 + 5, -cardHeight/2 + 5, cardWidth - 10, 25, 6);
-            
-            const rarityText = this.add.text(0, -cardHeight/2 + 17, item.rarity.toUpperCase(), {
-                fontSize: '12px',
-                color: '#ffffff',
-                fontFamily: 'Arial',
-                fontStyle: 'bold'
-            });
-            rarityText.setOrigin(0.5);
-            container.add([rarityBg, rarityText]);
-        }
+        
+        // Short description
+        const descText = this.add.text(0, cardHeight/2 - 25, item.description, {
+            fontSize: '12px',
+            color: canAfford ? '#cccccc' : '#555555',
+            fontFamily: 'Arial',
+            align: 'center',
+            wordWrap: { width: cardWidth - 30 }
+        });
+        descText.setOrigin(0.5);
 
         // Add to container
-        container.add([itemBg, priceTag, priceText, itemVisual, nameText]);
+        container.add([itemBg, priceContainer, itemVisual, nameText, descText]);
 
         // Make entire card interactive
         const hitArea = new Phaser.Geom.Rectangle(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight);
@@ -286,23 +348,11 @@ export default class ShopScene extends Phaser.Scene {
         
         if (canAfford) {
             container.on('pointerdown', (pointer, localX, localY, event) => {
-                console.log('Item clicked:', item.name, 'tab:', this.currentShopTab, 'index:', index);
-                
-                // Stop event propagation to prevent interference
-                if (event) {
-                    event.stopPropagation();
-                }
-                
-                // Double-check bounds at click time
-                const currentItems = this.currentShopTab === 'items' ? this.itemShopItems : this.heroShopItems;
-                if (index >= 0 && index < currentItems.length) {
-                    this.buyItem(index);
-                } else {
-                    console.warn('Click on invalid item index:', index, 'max:', currentItems.length - 1);
-                }
+                if (event) event.stopPropagation();
+                this.buyItem(index);
             });
             container.on('pointerover', () => {
-                container.setScale(1.05);
+                container.setScale(1.08);
                 this.showItemTooltip(item, container);
             });
             container.on('pointerout', () => {
@@ -322,32 +372,33 @@ export default class ShopScene extends Phaser.Scene {
     }
 
     createItemVisual(item, canAfford) {
-        const visual = this.add.container(0, -20);
+        const visual = this.add.container(0, -40);
         
         if (item.category === 'hero') {
-            // Hero portrait placeholder - would use actual portrait in full implementation
+            // Larger hero portrait
             const portraitBg = this.add.graphics();
-            portraitBg.fillStyle(canAfford ? 0x444444 : 0x222222);
-            portraitBg.fillRoundedRect(-60, -40, 120, 80, 8);
-            portraitBg.lineStyle(2, canAfford ? 0x666666 : 0x444444);
-            portraitBg.strokeRoundedRect(-60, -40, 120, 80, 8);
+            const bgColor = canAfford ? 0x444444 : 0x222222;
+            portraitBg.fillStyle(bgColor);
+            portraitBg.fillRoundedRect(-70, -50, 140, 100, 12);
+            portraitBg.lineStyle(3, canAfford ? 0x888888 : 0x444444);
+            portraitBg.strokeRoundedRect(-70, -50, 140, 100, 12);
             
-            // Hero type icon
+            // Hero type with larger icon
             const typeColor = item.type === 'damage' ? 0xff6666 : 
                              item.type === 'support' ? 0x66ff66 : 0x6666ff;
-            const typeIcon = this.add.circle(0, 0, 25, typeColor, canAfford ? 0.8 : 0.4);
+            const typeIcon = this.add.circle(0, 0, 35, typeColor, canAfford ? 0.9 : 0.4);
             
-            const typeSymbol = item.type === 'damage' ? '⚔' : 
-                              item.type === 'support' ? '🛡' : '⚡';
+            const typeSymbol = item.type === 'damage' ? '⚔️' : 
+                              item.type === 'support' ? '🛡️' : '⚡';
             const symbolText = this.add.text(0, 0, typeSymbol, {
-                fontSize: '24px',
+                fontSize: '32px',
                 color: '#ffffff'
             });
             symbolText.setOrigin(0.5);
             
             visual.add([portraitBg, typeIcon, symbolText]);
         } else {
-            // Item icon representation
+            // Larger item icon
             const itemIcon = this.createItemIcon(item, canAfford);
             visual.add(itemIcon);
         }
@@ -357,23 +408,30 @@ export default class ShopScene extends Phaser.Scene {
 
     createItemIcon(item, canAfford) {
         const iconBg = this.add.graphics();
-        iconBg.fillStyle(canAfford ? 0x333333 : 0x222222);
-        iconBg.fillCircle(0, 0, 40);
-        iconBg.lineStyle(3, canAfford ? 0x666666 : 0x444444);
-        iconBg.strokeCircle(0, 0, 40);
+        const rarityColor = item.rarity ? this.getRarityColor(item.rarity) : 0x8b4513;
         
-        // Item type specific icons
+        // Ornate circular background
+        iconBg.fillStyle(canAfford ? 0x3a2f28 : 0x222222);
+        iconBg.fillCircle(0, 0, 50);
+        iconBg.lineStyle(4, canAfford ? rarityColor : 0x444444, canAfford ? 1.0 : 0.5);
+        iconBg.strokeCircle(0, 0, 50);
+        
+        // Inner circle for depth
+        iconBg.lineStyle(2, canAfford ? rarityColor : 0x333333, canAfford ? 0.6 : 0.3);
+        iconBg.strokeCircle(0, 0, 42);
+        
+        // Item type specific icons with better visuals
         let iconSymbol = '?';
         let iconColor = '#ffffff';
         
         switch(item.type) {
             case 'consumable':
                 iconSymbol = '🧪';
-                iconColor = '#66ff66';
+                iconColor = '#66ff88';
                 break;
             case 'equipment':
                 iconSymbol = '💍';
-                iconColor = '#ffdd00';
+                iconColor = '#ffd700';
                 break;
             case 'deck_modifier':
                 iconSymbol = '🃏';
@@ -382,7 +440,7 @@ export default class ShopScene extends Phaser.Scene {
         }
         
         const iconText = this.add.text(0, 0, iconSymbol, {
-            fontSize: '32px',
+            fontSize: '40px',
             color: canAfford ? iconColor : '#666666'
         });
         iconText.setOrigin(0.5);
@@ -392,11 +450,12 @@ export default class ShopScene extends Phaser.Scene {
 
     getRarityColor(rarity) {
         switch(rarity) {
-            case 'common': return 0x888888;
-            case 'uncommon': return 0x4CAF50;
-            case 'rare': return 0x2196F3;
-            case 'legendary': return 0xFF9800;
-            default: return 0x666666;
+            case 'common': return 0x9e9e9e;
+            case 'uncommon': return 0x4caf50;
+            case 'rare': return 0x2196f3;
+            case 'legendary': return 0xff9800;
+            case 'mythic': return 0x9c27b0;
+            default: return 0x8b4513;
         }
     }
 
@@ -473,27 +532,23 @@ export default class ShopScene extends Phaser.Scene {
     }
 
     buyItem(itemIndex) {
-        const currentItems = this.currentShopTab === 'items' ? this.itemShopItems : this.heroShopItems;
-        const item = currentItems[itemIndex];
+        const item = this.shopInventory[itemIndex];
         
-        // Defensive check - make sure item exists
         if (!item) {
-            console.error('Shop item not found at index:', itemIndex, 'currentTab:', this.currentShopTab, 'itemsLength:', currentItems.length);
+            console.error('Shop item not found at index:', itemIndex);
             return;
         }
         
         if (this.playerGold >= item.price) {
-            // Check if it's a hero purchase
             if (item.category === 'hero') {
-                this.buyHero(item);
+                this.buyHero(item, itemIndex);
             } else {
-                this.buyRegularItem(item);
+                this.buyRegularItem(item, itemIndex);
             }
         }
     }
     
-    buyRegularItem(item) {
-        // Additional safety check
+    buyRegularItem(item, itemIndex) {
         if (!item || typeof item.price !== 'number') {
             console.error('Invalid item data:', item);
             return;
@@ -516,19 +571,18 @@ export default class ShopScene extends Phaser.Scene {
         // Show purchase feedback
         this.showPurchaseEffect(item);
 
-        // Refresh shop display
+        // Remove item from shop inventory (sold out)
+        this.shopInventory.splice(itemIndex, 1);
         this.refreshShopDisplay();
     }
     
-    buyHero(heroData) {
-        // Additional safety check
+    buyHero(heroData, itemIndex) {
         if (!heroData || typeof heroData.price !== 'number') {
             console.error('Invalid hero data:', heroData);
             return;
         }
         
         if (this.partyManager && this.partyManager.ownsHero(heroData.id)) {
-            // Show error - already own this hero
             this.showPurchaseError('You already own this hero!');
             return;
         }
@@ -543,16 +597,13 @@ export default class ShopScene extends Phaser.Scene {
             const hero = createHero(heroData.id);
             if (this.partyManager) {
                 this.partyManager.purchaseHero(hero);
-                console.log('Hero purchased successfully:', hero.name);
-                console.log('Party size after purchase:', this.partyManager.party.getSize());
-                console.log('Available heroes after purchase:', this.partyManager.availableHeroes.length);
-                console.log('All party heroes:', this.partyManager.getAllHeroes().map(h => h.name));
             }
 
             // Show purchase feedback
             this.showPurchaseEffect(heroData);
 
-            // Refresh shop display
+            // Remove hero from shop inventory (sold out)
+            this.shopInventory.splice(itemIndex, 1);
             this.refreshShopDisplay();
         } catch (error) {
             console.error('Failed to purchase hero:', error);
@@ -630,50 +681,59 @@ export default class ShopScene extends Phaser.Scene {
         }
         this.itemContainers = [];
 
-        // Recreate shop items with updated affordability
-        this.displayCurrentShopItems();
+        // Recreate shop display with remaining items
+        this.createShopDisplay();
     }
 
     updateGoldDisplay() {
-        this.goldDisplay.setText(`Gold: ${this.playerGold}`);
+        this.goldDisplay.setText(`${this.playerGold}`);
     }
 
     createContinueButton() {
         const screenWidth = this.cameras.main.width;
         const screenHeight = this.cameras.main.height;
 
-        const continueButton = this.add.rectangle(
-            screenWidth / 2,
-            screenHeight - 100,
-            300,
-            80,
-            0x2196F3
-        );
-        continueButton.setStrokeStyle(3, 0x42A5F5);
+        // Ornate continue button
+        const buttonContainer = this.add.container(screenWidth / 2, screenHeight - 120);
+        
+        const continueButton = this.add.graphics();
+        continueButton.fillGradientStyle(0x8b4513, 0x8b4513, 0x654321, 0x654321, 1);
+        continueButton.fillRoundedRect(-150, -40, 300, 80, 20);
+        continueButton.lineStyle(4, 0xd4af37, 1.0);
+        continueButton.strokeRoundedRect(-150, -40, 300, 80, 20);
+        
+        // Inner glow
+        continueButton.lineStyle(2, 0xffd700, 0.6);
+        continueButton.strokeRoundedRect(-144, -34, 288, 68, 16);
 
         const continueText = this.add.text(
-            screenWidth / 2,
-            screenHeight - 100,
-            'CONTINUE',
+            0,
+            0,
+            'VENTURE FORTH',
             {
-                fontSize: '32px',
-                color: '#ffffff',
+                fontSize: '36px',
+                color: '#d4af37',
                 fontFamily: 'Arial',
-                fontStyle: 'bold'
+                fontStyle: 'bold',
+                stroke: '#8b4513',
+                strokeThickness: 2
             }
         );
         continueText.setOrigin(0.5);
+        
+        buttonContainer.add([continueButton, continueText]);
 
         // Make interactive
-        continueButton.setInteractive();
-        continueButton.on('pointerdown', () => this.continueToNextBattle());
-        continueButton.on('pointerover', () => {
-            continueButton.setFillStyle(0x42A5F5);
-            continueText.setScale(1.1);
+        const hitArea = new Phaser.Geom.Rectangle(-150, -40, 300, 80);
+        buttonContainer.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        buttonContainer.on('pointerdown', () => this.continueToNextBattle());
+        buttonContainer.on('pointerover', () => {
+            buttonContainer.setScale(1.05);
+            continueText.setTint(0xffffff);
         });
-        continueButton.on('pointerout', () => {
-            continueButton.setFillStyle(0x2196F3);
-            continueText.setScale(1.0);
+        buttonContainer.on('pointerout', () => {
+            buttonContainer.setScale(1.0);
+            continueText.clearTint();
         });
     }
 

@@ -110,6 +110,7 @@ export default class BattleScene extends Phaser.Scene {
             }
         );
         this.infoButton.setOrigin(0.5);
+        this.infoButton.setScrollFactor(0); // Keep fixed to camera
         this.infoButton.setInteractive();
         this.infoButton.on('pointerdown', () => this.toggleInfoMenu());
         this.infoButton.on('pointerover', () => this.infoButton.setTint(0xffffff));
@@ -117,36 +118,27 @@ export default class BattleScene extends Phaser.Scene {
         
         // Info menu (initially hidden)
         this.infoMenu = this.add.container(screenWidth / 2, screenHeight / 2);
+        this.infoMenu.setScrollFactor(0); // Keep fixed to camera
         this.createInfoMenu();
         this.infoMenu.setVisible(false);
         this.infoMenuVisible = false;
         
-        // Hand cards display area
-        this.handCardsContainer = this.add.container(screenWidth / 2, screenHeight - 60);  // Moved up from 40 to 60
+        // Hand cards display area at bottom
+        this.handCardsContainer = this.add.container(screenWidth / 2, screenHeight - 140);  // Cards back at bottom
+        this.handCardsContainer.setScrollFactor(0); // Keep cards fixed to camera
         
         // Hero portraits area (above cards)
-        this.heroPortraitsContainer = this.add.container(screenWidth / 2, screenHeight - 500);  // Moved down from 600 to 500
+        this.heroPortraitsContainer = this.add.container(screenWidth / 2, screenHeight - 480);  // Portraits back above cards
+        this.heroPortraitsContainer.setScrollFactor(0); // Keep hero portraits fixed to camera
         
-        // Hand preview area
-        this.handPreview = this.add.text(
-            screenWidth / 2,
-            screenHeight - 280,     // Adjusted to fit between heroes and cards
-            '',
-            {
-                fontSize: '54px',   // 36 * 1.5
-                color: '#ffff00',
-                fontFamily: 'Arial',
-                fontStyle: 'bold',
-                align: 'center'
-            }
-        );
-        this.handPreview.setOrigin(0.5);
+        // Create damage calculation panel
+        this.createDamagePanel();
         
-        // Gold display
+        // Gold display with symbol
         this.goldDisplay = this.add.text(
             90,                     // 60 * 1.5
             90,                     // 60 * 1.5
-            'Gold: 0',
+            '🪙 0',
             {
                 fontSize: '54px',   // 36 * 1.5
                 color: '#ffdd00',
@@ -155,6 +147,7 @@ export default class BattleScene extends Phaser.Scene {
             }
         );
         this.goldDisplay.setOrigin(0, 0.5);
+        this.goldDisplay.setScrollFactor(0); // Keep fixed to camera
         
         // Hero display (removed - now shown in portraits)
         // this.heroDisplay = this.add.text(
@@ -197,6 +190,7 @@ export default class BattleScene extends Phaser.Scene {
             }
         );
         this.sortButton.setOrigin(0.5);
+        this.sortButton.setScrollFactor(0); // Keep fixed to camera
         this.sortButton.setInteractive();
         this.sortButton.on('pointerdown', () => this.battleManager.toggleSortMode());
         this.sortButton.on('pointerover', () => this.sortButton.setTint(0xdddddd));
@@ -216,6 +210,7 @@ export default class BattleScene extends Phaser.Scene {
             }
         );
         this.themeButton.setOrigin(0.5);
+        this.themeButton.setScrollFactor(0); // Keep fixed to camera
         this.themeButton.setInteractive();
         this.themeButton.on('pointerdown', () => this.toggleCardTheme());
         this.themeButton.on('pointerover', () => this.themeButton.setTint(0xdddddd));
@@ -223,6 +218,46 @@ export default class BattleScene extends Phaser.Scene {
         
         this.updateHeroDisplay();
         this.createHeroPortraits();
+    }
+    
+    createDamagePanel() {
+        const screenWidth = this.cameras.main.width;
+        const screenHeight = this.cameras.main.height;
+        
+        // Create panel container positioned in bottom left corner
+        this.damagePanelContainer = this.add.container(90, screenHeight - 90); // Bottom left corner
+        this.damagePanelContainer.setScrollFactor(0); // Keep fixed to camera
+        
+        // Panel background
+        const panelWidth = 350;
+        const panelHeight = 80;
+        const panelBg = this.add.graphics();
+        panelBg.fillStyle(0x2a2a2a, 0.9);
+        panelBg.fillRoundedRect(0, 0, panelWidth, panelHeight, 12);
+        panelBg.lineStyle(3, 0x555555, 0.8);
+        panelBg.strokeRoundedRect(0, 0, panelWidth, panelHeight, 12);
+        
+        // Inner glow
+        panelBg.lineStyle(1, 0x888888, 0.4);
+        panelBg.strokeRoundedRect(4, 4, panelWidth - 8, panelHeight - 8, 8);
+        
+        // Damage preview text
+        this.handPreview = this.add.text(
+            panelWidth / 2,
+            panelHeight / 2,
+            '',
+            {
+                fontSize: '36px',   // Smaller to fit in panel
+                color: '#ffffff',
+                fontFamily: 'Arial',
+                fontStyle: 'bold',
+                align: 'center'
+            }
+        );
+        this.handPreview.setOrigin(0.5);
+        
+        // Add elements to container
+        this.damagePanelContainer.add([panelBg, this.handPreview]);
     }
     
     createEnemies() {
@@ -344,11 +379,9 @@ Hover over cards for preview`;
         }
     }
     
-    updateHandDisplay(cards, selectedCards = []) {
-        // Clear previous hand display
-        this.handCardsContainer.removeAll(true);
-        
+    updateHandDisplay(cards, selectedCards = [], forceAnimation = false, newCards = []) {
         if (!cards || cards.length === 0) {
+            this.handCardsContainer.removeAll(true);
             this.handPreview.setText('');
             return;
         }
@@ -363,6 +396,27 @@ Hover over cards for preview`;
         // Store previous selection state to avoid replaying animations
         if (!this.previousSelectedCards) this.previousSelectedCards = [];
         
+        // Clear previous hand display
+        this.handCardsContainer.removeAll(true);
+        
+        // Determine which cards should animate
+        if (forceAnimation && newCards.length > 0) {
+            // Selective animation - only animate the specific new cards passed in
+            const newCardIds = newCards.map(card => `${card.rank}-${card.suit}`);
+            this.shouldAnimateCard = (index) => {
+                const cardId = `${cards[index].rank}-${cards[index].suit}`;
+                return newCardIds.includes(cardId);
+            };
+        } else if (forceAnimation) {
+            // Force all cards to animate (Space key)
+            this.shouldAnimateCard = (index) => true;
+        } else {
+            // No animation for regular updates
+            this.shouldAnimateCard = (index) => false;
+        }
+        
+        this.previousCards = [...cards];
+        
         cards.forEach((card, index) => {
             const cardX = startX + (index * cardSpacing);
             const baseCardY = 0;
@@ -372,8 +426,39 @@ Hover over cards for preview`;
             // Create card container for easier animation
             const cardContainer = this.add.container(cardX, isSelected ? baseCardY - 30 : baseCardY);
             
-            // Only animate if selection state changed
-            if (isSelected && !wasSelected) {
+            // Fan-in animation for new cards only
+            if (this.shouldAnimateCard(index)) {
+                // This is a new card - animate it in
+                cardContainer.x = 0; // Start at center
+                cardContainer.y = baseCardY + 80; // Start below
+                cardContainer.rotation = (index - (cards.length - 1) / 2) * 0.15; // Start with fan rotation
+                cardContainer.alpha = 0; // Start invisible
+                cardContainer.setScale(0.8); // Start slightly small
+                
+                // Calculate delay - count how many new cards come before this one
+                let newCardsBefore = 0;
+                for (let i = 0; i < index; i++) {
+                    if (this.shouldAnimateCard(i)) {
+                        newCardsBefore++;
+                    }
+                }
+                
+                // Animate to final position with fan effect
+                this.tweens.add({
+                    targets: cardContainer,
+                    x: cardX,
+                    y: isSelected ? baseCardY - 30 : baseCardY,
+                    rotation: 0, // End straight
+                    alpha: 1,
+                    scaleX: 1,
+                    scaleY: 1,
+                    duration: 500,
+                    ease: 'Back.out',
+                    delay: newCardsBefore * 80, // Stagger based on new card position
+                });
+            }
+            // Selection state animations (existing cards)
+            else if (isSelected && !wasSelected) {
                 cardContainer.y = baseCardY; // Start at base position
                 this.tweens.add({
                     targets: cardContainer,
@@ -413,29 +498,28 @@ Hover over cards for preview`;
             // Add selection highlight
             if (isSelected) {
                 const highlight = this.add.graphics();
-                highlight.lineStyle(6, 0xffff00);
+                highlight.lineStyle(6, 0xffffff);
                 highlight.strokeRoundedRect(-cardWidth/2 - 3, -cardHeight/2 - 3, cardWidth + 6, cardHeight + 6, 8);
                 cardContainer.add(highlight);
             }
             
-            // Card number indicator
-            const numberText = this.add.text(0, cardHeight/2 + 30, (index + 1).toString(), {
-                fontSize: '36px',  // Increased from 24px
-                color: '#666666',
-                fontFamily: 'Arial',
-                fontStyle: 'bold'
-            });
-            numberText.setOrigin(0.5);
+            // Card number indicator (hidden for cleaner look)
+            // const numberText = this.add.text(0, cardHeight/2 + 30, (index + 1).toString(), {
+            //     fontSize: '36px',  // Increased from 24px
+            //     color: '#666666',
+            //     fontFamily: 'Arial',
+            //     fontStyle: 'bold'
+            // });
+            // numberText.setOrigin(0.5);
             
-            // Add elements to container
+            // Add elements to container (without numberText)
             cardContainer.add([
                 cardData.graphics,
                 cardData.topRankText,
                 cardData.topSuitText,
                 cardData.bottomRankText,
                 cardData.bottomSuitText,
-                cardData.centerSuitText,
-                numberText
+                cardData.centerSuitText
             ]);
             
             // Make card interactive
@@ -519,8 +603,8 @@ Hover over cards for preview`;
                     heroModified = finalDamage !== baseDamage;
                 }
                 
-                // Update preview text to show base damage and hero bonus separately
-                let previewText = `${pokerHand.handName}\n${baseDamage} damage`;
+                // Update preview text with cleaner format
+                let previewText = `${pokerHand.handName} : ${baseDamage}`;
                 if (heroModified) {
                     previewText += ` (+${finalDamage - baseDamage})`;
                 }
@@ -570,25 +654,8 @@ Hover over cards for preview`;
         this.heroActivationEffects = [];
         this.heroBonusTexts = [];
         
-        // Reset all portrait positions if no heroes activated
-        if ((!activatedHeroes || activatedHeroes.length === 0) && this.heroManager) {
-            const heroes = this.heroManager.getAllHeroes();
-            const portraitContainers = this.heroPortraitsContainer.list;
-            
-            heroes.forEach((hero, index) => {
-                if (portraitContainers[index]) {
-                    const portraitContainer = portraitContainers[index];
-                    // Reset to stored original position
-                    if (portraitContainer.originalY !== undefined) {
-                        this.tweens.add({
-                            targets: portraitContainer,
-                            y: portraitContainer.originalY,
-                            duration: 200,
-                            ease: 'Power2'
-                        });
-                    }
-                }
-            });
+        // No need to reset portrait positions since we don't move them anymore
+        if (!activatedHeroes || activatedHeroes.length === 0) {
             return;
         }
         
@@ -611,7 +678,7 @@ Hover over cards for preview`;
                         glowColor = UIConfig.hero.abilityColors[abilityType] || UIConfig.hero.abilityColors.damage;
                     }
                     
-                    // Create glowing effect around activated hero portrait
+                    // Create glowing effect around activated hero portrait as part of the container
                     const glowEffect = this.add.graphics();
                     glowEffect.lineStyle(UIConfig.hero.glowThickness, glowColor, 1.0);
                     glowEffect.strokeRoundedRect(
@@ -622,9 +689,8 @@ Hover over cards for preview`;
                         12
                     );
                     
-                    // Position at the same location as the portrait container
-                    glowEffect.x = this.heroPortraitsContainer.x + portraitContainer.x;
-                    glowEffect.y = this.heroPortraitsContainer.y + portraitContainer.y;
+                    // Add glow effect to the portrait container so it renders with proper layering
+                    portraitContainer.addAt(glowEffect, 0); // Add at index 0 so it renders behind other elements
                     
                     // Add pulsing animation
                     this.tweens.add({
@@ -636,31 +702,17 @@ Hover over cards for preview`;
                         ease: 'Sine.easeInOut'
                     });
                     
-                    // Store original position if not already stored
+                    // Store original position for bonus text positioning
                     if (portraitContainer.originalY === undefined) {
                         portraitContainer.originalY = portraitContainer.y;
                     }
                     
-                    // Animate portrait container to slide up slightly to fixed position
-                    this.tweens.add({
-                        targets: portraitContainer,
-                        y: portraitContainer.originalY - 8,
-                        duration: 300,
-                        ease: 'Back.out'
-                    });
-                    
-                    // Move the glow effect to follow the portrait
-                    this.tweens.add({
-                        targets: glowEffect,
-                        y: this.heroPortraitsContainer.y + portraitContainer.originalY - 8,
-                        duration: 300,
-                        ease: 'Back.out'
-                    });
+                    // No portrait elevation - keep portraits in original position to reduce visual noise
                     
                     // Add bonus indicator text next to portrait
                     const heroBonusText = this.add.text(
                         this.heroPortraitsContainer.x + portraitContainer.x + 90,
-                        this.heroPortraitsContainer.y + portraitContainer.originalY - 28, // Use original position minus offset
+                        this.heroPortraitsContainer.y + portraitContainer.y - 20, // Position relative to current portrait position
                         '+',
                         {
                             fontSize: '32px',
@@ -671,7 +723,7 @@ Hover over cards for preview`;
                     );
                     heroBonusText.setOrigin(0.5);
                     
-                    // Add pulsing animation to bonus text and move it up too
+                    // Add pulsing animation to bonus text only
                     this.tweens.add({
                         targets: heroBonusText,
                         scaleX: { from: 1.0, to: 1.3 },
@@ -680,14 +732,6 @@ Hover over cards for preview`;
                         yoyo: true,
                         repeat: -1,
                         ease: 'Sine.easeInOut'
-                    });
-                    
-                    // Move the bonus text up with the portrait (to fixed position)
-                    this.tweens.add({
-                        targets: heroBonusText,
-                        y: this.heroPortraitsContainer.y + portraitContainer.originalY - 36, // Fixed position
-                        duration: 300,
-                        ease: 'Back.out'
                     });
                     
                     this.heroActivationEffects.push(glowEffect);
@@ -704,7 +748,7 @@ Hover over cards for preview`;
     
     updateGoldDisplay() {
         const gold = this.inventory.getResource('gold');
-        this.goldDisplay.setText(`Gold: ${gold}`);
+        this.goldDisplay.setText(`🪙 ${gold}`);
     }
     
     updateHeroDisplay() {
@@ -770,15 +814,30 @@ Hover over cards for preview`;
             const portraitBg = this.add.graphics();
             portraitBg.fillStyle(isActive ? 0x444444 : 0x222222);
             portraitBg.fillRoundedRect(-portraitWidth/2, -portraitHeight/2, portraitWidth, portraitHeight, 8);
-            portraitBg.lineStyle(isActive ? 4 : 2, isActive ? 0x000000 : 0x666666);
+            portraitBg.lineStyle(isActive ? 3 : 2, isActive ? 0x888888 : 0x666666);
             portraitBg.strokeRoundedRect(-portraitWidth/2, -portraitHeight/2, portraitWidth, portraitHeight, 8);
             
-            // Hero portrait image
+            // Hero portrait image with cropping
             let heroImage = null;
             if (hero.portraitKey && this.textures.exists(hero.portraitKey)) {
                 heroImage = this.add.image(0, 0, hero.portraitKey);
-                heroImage.setDisplaySize(portraitWidth - 8, portraitHeight - 8);
-                heroImage.setOrigin(0.5);
+                
+                // Scale to fit width, keeping aspect ratio
+                const texture = this.textures.get(hero.portraitKey);
+                const textureWidth = texture.source[0].width;
+                const textureHeight = texture.source[0].height;
+                
+                // Scale to fit the width
+                const scale = (portraitWidth - 8) / textureWidth;
+                const scaledHeight = textureHeight * scale;
+                
+                // Set the scale and crop from bottom
+                heroImage.setScale(scale);
+                heroImage.setOrigin(0.5, 0.4); // Move origin up to show top portion
+                
+                // Crop to show only the top portion
+                const cropHeight = Math.min(textureHeight, textureHeight * (portraitHeight - 8) / scaledHeight);
+                heroImage.setCrop(0, 0, textureWidth, cropHeight);
             } else {
                 // Fallback colored rectangle
                 const fallbackColor = hero.type === 'damage' ? 0xff6666 : 
@@ -847,6 +906,7 @@ Hover over cards for preview`;
         
         // Create tooltip container
         this.heroTooltip = this.add.container(tooltipX, tooltipY);
+        this.heroTooltip.setScrollFactor(0); // Keep fixed to camera
         
         // Tooltip background
         const tooltipWidth = UIConfig.hero.tooltip.width;

@@ -49,7 +49,7 @@ export const CardThemes = {
 };
 
 // Current active theme
-let currentTheme = 'classic';
+let currentTheme = 'magic';
 
 export function getCurrentTheme() {
     return CardThemes[currentTheme];

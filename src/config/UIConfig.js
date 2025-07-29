@@ -3,7 +3,7 @@ export const UIConfig = {
     // Hero portrait settings
     hero: {
         portraitWidth: 360,      // 240 * 1.5
-        portraitHeight: 225,     // 150 * 1.5
+        portraitHeight: 180,     // 150 * 1.5 reduced by 1/5th (225 -> 180)
         spacing: 390,            // 260 * 1.5
         glowThickness: 12,       // 8 * 1.5
         
