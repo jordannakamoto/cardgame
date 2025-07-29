@@ -201,6 +201,7 @@ export default class Enemy {
         });
         
         // Notify battle manager (gold will be awarded at battle end)
+        console.log('Enemy emitting death event:', this.name, 'currentHealth:', this.currentHealth, 'isAlive:', this.isAlive);
         this.scene.events.emit('enemyDied', this);
     }
     

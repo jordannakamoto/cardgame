@@ -47,9 +47,9 @@ PreloadScene → GameScene → BattleScene (default flow)
 
 #### Enemy System
 - **Enemy** (`src/battle/Enemy.js`): Individual enemy entities with health, targeting, damage preview
-  - **Mouse Targeting**: Click enemies to select them as targets
-  - **Hover Effects**: Visual feedback on mouseover
-  - **Interactive Sprites**: Clickable enemy sprites with tint effects
+  - **Premium Targeting**: Ornate silver arrow cursor with blue glow effects
+  - **Interactive Sprites**: Pixel-perfect click detection for image sprites
+  - **Subtle Camera Effects**: Minimal zoom (1.02x) and pan (0.5%) when targeting
 - **EnemyTypes** (`src/battle/EnemyTypes.js`): Centralized enemy definitions
 - **EnemyFactory**: Creates enemies from type definitions
 - **Enemy Art System**: Loads from `public/assets/enemies/` with fallback colored rectangles
@@ -57,14 +57,14 @@ PreloadScene → GameScene → BattleScene (default flow)
 #### Hero System
 - **Hero** (`src/heroes/Hero.js`): Base hero class with multipliers and abilities
   - **Multiplier System**: Conditional damage bonuses based on hand types
-  - **Mana System**: Generate mana from played cards, spend on abilities
-  - **Portrait System**: Visual representation with landscape aspect ratio (160x100)
+  - **Mana System**: Generate mana from played cards, spend on abilities (disabled)
+  - **Portrait System**: Visual representation cropped to 360x180px for cleaner look
 - **HeroManager** (`src/heroes/HeroManager.js`): Manages party of heroes
 - **StarterHero** (`src/heroes/heroes/StarterHero.js`): Basic hero with pair bonus
 - **Visual Feedback**: 
   - Orange glow and "+" indicator when abilities activate
-  - Portrait animation (slides up 8px) during preview
-  - Portrait flash animation during attack execution
+  - No portrait elevation for reduced visual noise
+  - Subtle glow effects behind other UI elements
 
 #### Inventory System
 - **Inventory** (`src/inventory/Inventory.js`): Resource management
@@ -92,11 +92,11 @@ TROLL: { health: 120, goldReward: 18, artPath: 'assets/enemies/troll1.png' }
 - **Enemy Targeting**: Arrow keys to cycle or mouse click to select enemies
 - **Hero Abilities**: Conditional multipliers that modify damage based on hand types
 - **Visual Feedback**: 
-  - Selected cards lift up with yellow highlight and animation
-  - Damage preview shows base damage + hero bonus: "20 damage (+10)"
-  - Hero portrait glow, "+" indicator, and slide animation when abilities activate
-  - Enemy health bars with damage visualization and click targeting
-  - Victory screen with total gold earned
+  - Selected cards lift up with white highlight and animation
+  - Damage preview in bottom-left panel: "High Card : 11 (+10)"
+  - Hero portrait glow and "+" indicator when abilities activate (no elevation)
+  - Enemy health bars with damage visualization and premium targeting cursor
+  - Elegant victory screen with animated gold counting and ornate panel
 
 ### Test System
 - **Custom Framework** (`/test/testFramework.js`): No Jest dependency
@@ -107,12 +107,13 @@ TROLL: { health: 120, goldReward: 18, artPath: 'assets/enemies/troll1.png' }
 
 ### Visual Systems
 - **Responsive Design**: Cards and UI scale with screen size
-- **Animation System**: Card selection, damage text, enemy death animations
+- **Animation System**: Card selection, damage text, enemy death animations, card fan-in effects
 - **Art Integration**: Dynamic loading of enemy sprites with fallback system
 - **Quality Settings**: Anti-aliasing enabled, pixel rounding for crisp text
+- **Card Theming**: Magic theme default with gradient backgrounds and ornate decorations
 
 ### Input System
-- **Keyboard**: 1-8 for card selection, arrows for targeting, Enter to attack, Space for new hand, I for info menu
+- **Keyboard**: 1-8 for card selection (hidden), arrows for targeting, Enter to attack, Space for new hand, I for info menu
 - **Mouse**: Click cards to select, click enemies to target, hover for card preview
 - **Info Menu**: Toggleable controls and game info overlay (I key or button)
 - **Hero Interaction**: Click hero portraits to switch active hero
@@ -199,5 +200,14 @@ The game is a complete card battle system where players use poker hands to damag
 - **Interactive Targeting**: Mouse and keyboard support for enemy selection
 - **Resource Management**: Gold-based economy with inventory system
 - **Scalable Hero System**: Framework for adding more heroes with unique abilities
+
+### Recent Polish Improvements
+- **Enhanced UI Layout**: Damage preview moved to bottom-left panel for better visibility
+- **Elegant Victory Screen**: Balatro-style ornate panel with animated gold counting
+- **Premium Enemy Targeting**: Silver arrow cursor with blue glow effects and subtle camera pan
+- **Card Animation System**: Fan-in animation for newly drawn cards with selective targeting
+- **Visual Refinements**: Gold displays use coin symbols (🪙), hero portraits cropped instead of squished
+- **Magic Theme Default**: Rich gradient card backgrounds with ornate decorations
+- **Clean Interface**: Removed visual clutter like card numbers and hero elevation effects
 
 All major systems are implemented, tested, and scaled for high-resolution display. The game is ready for expansion with additional heroes, enemies, items, and game modes.

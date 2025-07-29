@@ -10,6 +10,11 @@ export default class BattleManager {
         this.selectedCards = [];
         this.isPlayerTurn = true;
         this.battleWon = false;
+        this.gameOverScreenShown = false;
+        this.victoryScreenShown = false;
+        this.victoryTimeoutId = null;
+        this.victoryKeyHandler = null;
+        this.victoryClickHandler = null;
         this.sortByRank = true; // true = by rank, false = by suit
         
         // Damage multipliers for poker hands
@@ -27,9 +32,52 @@ export default class BattleManager {
         };
         
         this.setupInputHandlers();
+        
+        // Clean up any lingering victory screen handlers from previous battles
+        this.cleanupVictoryHandlers();
+        
+        // Clean up any existing event listeners first - remove ALL enemyDied listeners
+        this.scene.events.removeAllListeners('enemyDied');
+        
+        // Listen for enemy death events (once in constructor)
+        console.log('BattleManager: Setting up enemyDied event listener');
+        this.scene.events.on('enemyDied', this.onEnemyDied, this);
+    }
+    
+    cleanupVictoryHandlers() {
+        console.log('Cleaning up any existing victory handlers...');
+        
+        // Hide any visible victory/defeat overlays
+        const victoryOverlay = document.getElementById('victory-overlay');
+        const defeatOverlay = document.getElementById('defeat-overlay');
+        
+        if (victoryOverlay) {
+            victoryOverlay.style.display = 'none';
+            const victoryPanel = victoryOverlay.querySelector('.glass-panel');
+            if (victoryPanel) {
+                victoryPanel.classList.remove('show');
+            }
+        }
+        
+        if (defeatOverlay) {
+            defeatOverlay.style.display = 'none';
+            const defeatPanel = defeatOverlay.querySelector('.glass-panel');
+            if (defeatPanel) {
+                defeatPanel.classList.remove('show');
+            }
+        }
+        
+        // Clear any victory-related timeouts that might be pending
+        // Since we can't track all timeout IDs, we'll clear a reasonable range
+        for (let i = 1; i < 1000; i++) {
+            clearTimeout(i);
+        }
+        
+        console.log('Victory handlers cleanup complete');
     }
     
     addEnemy(enemy) {
+        console.log('Adding enemy:', enemy.name, 'Health:', enemy.currentHealth, 'isAlive:', enemy.isAlive);
         this.enemies.push(enemy);
         
         // Set first enemy as default target
@@ -37,8 +85,7 @@ export default class BattleManager {
             this.selectEnemy(0);
         }
         
-        // Listen for enemy death
-        this.scene.events.on('enemyDied', this.onEnemyDied, this);
+        console.log('Total enemies:', this.enemies.length, 'Alive enemies:', this.getAliveEnemies().length);
     }
     
     setupInputHandlers() {
@@ -51,14 +98,16 @@ export default class BattleManager {
             this.cycleTarget(1);
         });
         
-        // Enter to attack with selected cards
+        // Enter to attack with selected cards (doesn't end turn)
         this.scene.input.keyboard.on('keydown-ENTER', () => {
             this.attackSelectedEnemy();
         });
         
-        // Space to get new hand (for testing)
+        // Space to end turn (triggers enemy attacks)
         this.scene.input.keyboard.on('keydown-SPACE', () => {
-            this.drawNewHand(true); // Always animate manual hand draws
+            if (this.isPlayerTurn) {
+                this.endPlayerTurn();
+            }
         });
         
         // Number keys 1-8 to select/deselect cards
@@ -139,6 +188,11 @@ export default class BattleManager {
     }
     
     toggleCardSelection(cardIndex) {
+        console.log('=== toggleCardSelection called ===');
+        console.log('Card index:', cardIndex, 'Hand length:', this.playerHand.length);
+        console.log('Is player turn:', this.isPlayerTurn);
+        console.log('Call stack:', new Error().stack);
+        
         Logger.log('cardSelection', `Toggling card selection for card ${cardIndex + 1}`);
         if (!this.isPlayerTurn || cardIndex >= this.playerHand.length) {
             Logger.log('cardSelection', `Cannot select card: playerTurn=${this.isPlayerTurn}, cardIndex=${cardIndex}, handLength=${this.playerHand.length}`);
@@ -162,6 +216,7 @@ export default class BattleManager {
             Logger.log('cardSelection', `Card ${cardIndex + 1} deselected. Selected cards:`, this.selectedCards);
         }
         
+        console.log('Emitting handChanged event with', this.selectedCards.length, 'selected cards');
         this.scene.events.emit('handChanged', this.playerHand, this.selectedCards);
     }
     
@@ -214,7 +269,6 @@ export default class BattleManager {
         
         // Remove used cards from hand and clear selection
         this.removeSelectedCards();
-        this.endPlayerTurn();
     }
     
     removeSelectedCards() {
@@ -394,14 +448,185 @@ export default class BattleManager {
             enemiesRemaining: this.enemies.filter(e => e.isAlive).length
         });
         
-        // Simple AI turn - just wait and return to player
-        this.scene.time.delayedCall(1000, () => {
+        // Start enemy turn
+        this.startEnemyTurn();
+    }
+    
+    startEnemyTurn() {
+        console.log('Starting enemy turn...');
+        const aliveEnemies = this.getAliveEnemies();
+        
+        if (aliveEnemies.length === 0) {
+            // No enemies left, return to player turn
             this.startPlayerTurn();
+            return;
+        }
+        
+        // Each alive enemy attacks in sequence
+        this.processEnemyAttacks(aliveEnemies, 0);
+    }
+    
+    processEnemyAttacks(enemies, enemyIndex) {
+        if (enemyIndex >= enemies.length) {
+            // All enemies have attacked, return to player turn
+            this.scene.time.delayedCall(800, () => {
+                this.startPlayerTurn();
+            });
+            return;
+        }
+        
+        const enemy = enemies[enemyIndex];
+        if (!enemy.isAlive) {
+            // Skip dead enemies
+            this.processEnemyAttacks(enemies, enemyIndex + 1);
+            return;
+        }
+        
+        // Enemy performs attack
+        this.performEnemyAttack(enemy, () => {
+            // After this enemy's attack, move to next enemy
+            this.scene.time.delayedCall(600, () => {
+                this.processEnemyAttacks(enemies, enemyIndex + 1);
+            });
         });
     }
     
+    performEnemyAttack(enemy, onComplete) {
+        console.log(`${enemy.name} is attacking!`);
+        
+        // Calculate enemy damage (simple for now)
+        const damage = this.calculateEnemyDamage(enemy);
+        
+        // Choose target hero (random for now, could be smarter later)
+        const aliveHeroes = this.getAliveHeroes();
+        if (aliveHeroes.length === 0) {
+            // No heroes left - game over
+            console.log('All heroes defeated!');
+            this.onGameOver();
+            return;
+        }
+        
+        const targetHero = aliveHeroes[Math.floor(Math.random() * aliveHeroes.length)];
+        
+        // Show attack animation and damage
+        this.showEnemyAttackEffect(enemy, targetHero, damage, () => {
+            // Apply damage to hero
+            targetHero.takeDamage(damage);
+            
+            // Update hero display
+            this.scene.updateHeroPortraits();
+            
+            // Check for game over after hero takes damage
+            if (this.getAliveHeroes().length === 0) {
+                console.log('Last hero defeated! Game Over!');
+                this.onGameOver();
+                return;
+            }
+            
+            onComplete();
+        });
+    }
+    
+    calculateEnemyDamage(enemy) {
+        // Simple damage calculation based on enemy type
+        let baseDamage = 15; // Default damage
+        
+        if (enemy.name === 'Goblin') baseDamage = 12;
+        else if (enemy.name === 'Orc') baseDamage = 18;
+        else if (enemy.name === 'Troll') baseDamage = 25;
+        
+        // Add some randomness (±3 damage)
+        const variance = Math.floor(Math.random() * 7) - 3;
+        return Math.max(1, baseDamage + variance);
+    }
+    
+    showEnemyAttackEffect(enemy, targetHero, damage, onComplete) {
+        // Visual attack effect - enemy briefly grows and shows damage text
+        const originalScale = enemy.sprite ? (enemy.sprite.scaleX || 1) : 1;
+        
+        if (enemy.sprite) {
+            // Enemy attack animation - brief grow
+            this.scene.tweens.add({
+                targets: enemy.sprite,
+                scaleX: originalScale * 1.15,
+                scaleY: originalScale * 1.15,
+                duration: 200,
+                yoyo: true,
+                ease: 'Power2'
+            });
+        }
+        
+        // Show damage text on hero
+        const heroIndex = this.scene.heroManager.getAllHeroes().indexOf(targetHero);
+        const portraitContainers = this.scene.heroPortraitsContainer.list;
+        
+        if (portraitContainers[heroIndex]) {
+            const portraitContainer = portraitContainers[heroIndex];
+            const worldPos = portraitContainer.getWorldTransformMatrix();
+            
+            const damageText = this.scene.add.text(
+                this.scene.heroPortraitsContainer.x + portraitContainer.x,
+                this.scene.heroPortraitsContainer.y + portraitContainer.y - 50,
+                `-${damage}`,
+                {
+                    fontSize: '36px',
+                    color: '#ff4444',
+                    fontFamily: 'Arial',
+                    fontStyle: 'bold',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                }
+            );
+            damageText.setOrigin(0.5);
+            damageText.setScrollFactor(0);
+            
+            // Animate damage text
+            this.scene.tweens.add({
+                targets: damageText,
+                y: damageText.y - 60,
+                alpha: 0,
+                duration: 1200,
+                ease: 'Power2',
+                onComplete: () => damageText.destroy()
+            });
+            
+            // Flash the hero portrait red
+            if (portraitContainers[heroIndex]) {
+                const portrait = portraitContainers[heroIndex];
+                // Find the actual image within the container
+                const portraitImage = portrait.list.find(child => child.texture);
+                if (portraitImage) {
+                    this.scene.tweens.add({
+                        targets: portraitImage,
+                        tint: 0xff4444,
+                        duration: 150,
+                        yoyo: true,
+                        onComplete: () => {
+                            portraitImage.clearTint();
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Complete after animation
+        this.scene.time.delayedCall(800, onComplete);
+    }
+    
+    getAliveHeroes() {
+        if (!this.scene.heroManager) return [];
+        return this.scene.heroManager.getAllHeroes().filter(hero => hero.currentHealth > 0);
+    }
+    
     startPlayerTurn() {
+        // Don't start player turn if there are no enemies (battle not properly initialized)
+        if (this.enemies.length === 0) {
+            console.log('Cannot start player turn: no enemies loaded yet');
+            return;
+        }
+        
         this.isPlayerTurn = true;
+        console.log('Starting player turn with', this.enemies.length, 'enemies,', this.getAliveEnemies().length, 'alive');
         
         // Emit round start event for heroes
         this.scene.events.emit('roundStart', {
@@ -411,12 +636,10 @@ export default class BattleManager {
             offerGoldSpend: this.offerGoldSpend.bind(this)
         });
         
-        // Only draw new hand if player has no cards
-        if (this.playerHand.length === 0) {
-            // Add a flag to track if this is the initial battle start
-            const isInitialBattle = !this.hasDealtInitialHand;
-            this.hasDealtInitialHand = true;
-            this.drawNewHand(isInitialBattle);
+        // Always draw cards to fill hand back to 8 at start of turn
+        if (this.playerHand.length < 8) {
+            // Always animate when drawing cards at start of turn
+            this.drawNewHand(true);
         }
     }
     
@@ -456,11 +679,22 @@ export default class BattleManager {
     }
     
     onEnemyDied(enemy) {
+        console.log('=== onEnemyDied called ===');
+        console.log('Enemy died:', enemy.name, 'Alive enemies remaining:', this.getAliveEnemies().length);
+        console.log('All enemies status:', this.enemies.map(e => ({ name: e.name, isAlive: e.isAlive, health: e.currentHealth })));
+        console.log('Call stack:', new Error().stack);
+        
         // Clear damage preview from all enemies first
         this.enemies.forEach(e => e.hideDamagePreview());
         
-        // Check if all enemies are dead
-        if (this.getAliveEnemies().length === 0 && !this.battleWon) {
+        // Check if all enemies are dead (but only if we actually have enemies)
+        const aliveEnemies = this.getAliveEnemies();
+        console.log('Victory check: total enemies =', this.enemies.length, 'alive enemies =', aliveEnemies.length, 'battleWon =', this.battleWon);
+        
+        if (this.enemies.length > 0 && aliveEnemies.length === 0 && !this.battleWon) {
+            console.log('All enemies defeated! Showing victory screen...');
+            console.log('Enemy states:', this.enemies.map(e => ({name: e.name, isAlive: e.isAlive, health: e.currentHealth})));
+            console.log('About to call onBattleWon()');
             this.battleWon = true;
             this.onBattleWon();
             return;
@@ -481,162 +715,82 @@ export default class BattleManager {
     }
     
     onBattleWon() {
+        console.log('=== onBattleWon() called ===');
+        console.log('Victory screen shown flag:', this.victoryScreenShown);
+        console.log('Call stack:', new Error().stack);
+        
+        // Prevent multiple victory screens
+        if (this.victoryScreenShown) {
+            console.log('Victory screen already shown, ignoring duplicate call');
+            return;
+        }
+        this.victoryScreenShown = true;
+        
+        // Disable player input during victory screen
+        this.isPlayerTurn = false;
+        
         // Calculate total gold earned this battle
         const totalGoldEarned = this.enemies.reduce((total, enemy) => total + enemy.goldReward, 0);
         
-        // Semi-transparent background overlay (separate from container)
-        const overlay = this.scene.add.graphics();
-        overlay.fillStyle(0x000000, 0.7);
-        overlay.fillRect(0, 0, this.scene.cameras.main.width, this.scene.cameras.main.height);
-        overlay.setScrollFactor(0);
+        // Show CSS glassmorphism victory overlay
+        const victoryOverlay = document.getElementById('victory-overlay');
+        const victoryGoldElement = document.getElementById('victory-gold');
+        const victoryPanel = victoryOverlay.querySelector('.glass-panel');
         
-        // Create victory panel container
-        const victoryContainer = this.scene.add.container(
-            this.scene.cameras.main.centerX,
-            this.scene.cameras.main.centerY
-        );
-        victoryContainer.setScrollFactor(0);
+        // Position overlay to match canvas bounds
+        this.positionOverlayToCanvas(victoryOverlay);
         
-        // Ornate victory panel background
-        const panelWidth = 600;
-        const panelHeight = 300;
-        const panelBg = this.scene.add.graphics();
+        // Show overlay
+        victoryOverlay.style.display = 'block';
         
-        // Gradient background
-        panelBg.fillGradientStyle(0x2a1810, 0x2a1810, 0x1a0f08, 0x1a0f08, 1);
-        panelBg.fillRoundedRect(-panelWidth/2, -panelHeight/2, panelWidth, panelHeight, 20);
+        // Animate panel in
+        setTimeout(() => {
+            victoryPanel.classList.add('show');
+        }, 100);
         
-        // Golden border
-        panelBg.lineStyle(6, 0xd4af37, 1.0);
-        panelBg.strokeRoundedRect(-panelWidth/2, -panelHeight/2, panelWidth, panelHeight, 20);
-        
-        // Inner border
-        panelBg.lineStyle(3, 0x8b4513, 0.8);
-        panelBg.strokeRoundedRect(-panelWidth/2 + 8, -panelHeight/2 + 8, panelWidth - 16, panelHeight - 16, 15);
-        
-        // Victory text with golden styling
-        const victoryText = this.scene.add.text(
-            0,
-            -60,
-            'VICTORY!',
-            {
-                fontSize: '84px',
-                color: '#d4af37',
-                fontFamily: 'Arial',
-                fontStyle: 'bold',
-                stroke: '#8b4513',
-                strokeThickness: 4
-            }
-        );
-        victoryText.setOrigin(0.5);
-        
-        // Gold earned with coin symbol (starts at 0 for counting animation)
-        const goldText = this.scene.add.text(
-            0,
-            20,
-            `🪙 +0`,
-            {
-                fontSize: '48px',
-                color: '#ffd700',
-                fontFamily: 'Arial',
-                fontStyle: 'bold',
-                stroke: '#8b4513',
-                strokeThickness: 3
-            }
-        );
-        goldText.setOrigin(0.5);
-        
-        // Count up animation for gold
+        // Animate gold counting
         let currentGold = 0;
-        const goldCountTween = this.scene.tweens.addCounter({
-            from: 0,
-            to: totalGoldEarned,
-            duration: 1500,
-            delay: 500, // Start after panel slides in
-            ease: 'Power2',
-            onUpdate: (tween) => {
-                const value = Math.floor(tween.getValue());
-                if (value !== currentGold) {
-                    currentGold = value;
-                    goldText.setText(`🪙 +${currentGold}`);
-                    
-                    // Add a little bounce effect when counting
-                    goldText.setScale(1.1);
-                    this.scene.tweens.add({
-                        targets: goldText,
-                        scaleX: 1.0,
-                        scaleY: 1.0,
-                        duration: 100,
-                        ease: 'Back.out'
-                    });
-                }
-            },
-            onComplete: () => {
-                // Final bounce when counting is done
-                this.scene.tweens.add({
-                    targets: goldText,
-                    scaleX: 1.2,
-                    scaleY: 1.2,
-                    duration: 200,
-                    yoyo: true,
-                    ease: 'Back.out'
-                });
+        const goldInterval = setInterval(() => {
+            currentGold += Math.ceil(totalGoldEarned / 30); // Count up over ~1 second
+            if (currentGold >= totalGoldEarned) {
+                currentGold = totalGoldEarned;
+                clearInterval(goldInterval);
             }
-        });
-        
-        // Continue prompt
-        const continueText = this.scene.add.text(
-            0,
-            80,
-            'Press any key to continue...',
-            {
-                fontSize: '24px',
-                color: '#cccccc',
-                fontFamily: 'Arial',
-                fontStyle: 'italic'
-            }
-        );
-        continueText.setOrigin(0.5);
-        
-        // Add elements to container (overlay is separate)
-        victoryContainer.add([panelBg, victoryText, goldText, continueText]);
+            victoryGoldElement.textContent = `+ ${currentGold} gold`;
+        }, 40);
         
         // Award the gold
         this.scene.events.emit('goldEarned', totalGoldEarned);
         
-        // Entrance animation - slide in from top
-        victoryContainer.y = -this.scene.cameras.main.height;
-        this.scene.tweens.add({
-            targets: victoryContainer,
-            y: this.scene.cameras.main.centerY,
-            duration: 800,
-            ease: 'Back.out'
-        });
-        
-        // Gentle pulsing animation for victory text
-        this.scene.tweens.add({
-            targets: victoryText,
-            scaleX: { from: 1.0, to: 1.1 },
-            scaleY: { from: 1.0, to: 1.1 },
-            duration: 1000,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-        });
-        
-        // Pulsing continue text
-        this.scene.tweens.add({
-            targets: continueText,
-            alpha: { from: 1.0, to: 0.4 },
-            duration: 1200,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.easeInOut'
-        });
+        // Clean up any existing victory handlers first
+        if (this.victoryTimeoutId) {
+            clearTimeout(this.victoryTimeoutId);
+        }
+        if (this.victoryKeyHandler) {
+            document.removeEventListener('keydown', this.victoryKeyHandler);
+        }
+        if (this.victoryClickHandler) {
+            const oldOverlay = document.getElementById('victory-overlay');
+            if (oldOverlay) {
+                oldOverlay.removeEventListener('click', this.victoryClickHandler);
+            }
+        }
         
         // Transition to shop after delay or any key press
         const continueHandler = () => {
             console.log('Victory screen continuing to shop...');
+            // Hide overlay
+            victoryOverlay.style.display = 'none';
+            victoryPanel.classList.remove('show');
+            // Clear event listeners
+            document.removeEventListener('keydown', continueHandler);
+            victoryOverlay.removeEventListener('click', continueHandler);
+            
+            // Clear our stored handlers
+            this.victoryTimeoutId = null;
+            this.victoryKeyHandler = null;
+            this.victoryClickHandler = null;
+            
             this.scene.scene.start('ShopScene', {
                 gold: this.scene.inventory.getResource('gold'),
                 inventory: this.scene.inventory,
@@ -644,17 +798,91 @@ export default class BattleManager {
             });
         };
         
-        // Auto-continue after 5 seconds
-        this.scene.time.delayedCall(5000, continueHandler);
+        // Store handlers for cleanup
+        this.victoryKeyHandler = continueHandler;
+        this.victoryClickHandler = continueHandler;
         
-        // Manual continue with any key
-        this.scene.input.keyboard.once('keydown', continueHandler);
+        // Longer auto-continue delay to prevent immediate transition
+        this.victoryTimeoutId = setTimeout(continueHandler, 8000);
         
-        // Manual continue with click on overlay
-        overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, this.scene.cameras.main.width, this.scene.cameras.main.height), Phaser.Geom.Rectangle.Contains);
-        overlay.once('pointerdown', continueHandler);
+        // Delay manual continue to allow victory screen to fully appear
+        setTimeout(() => {
+            // Manual continue with any key (after delay)
+            document.addEventListener('keydown', continueHandler, { once: true });
+            
+            // Manual continue with click on overlay (after delay)
+            victoryOverlay.addEventListener('click', continueHandler, { once: true });
+        }, 1500);
         
         console.log('Victory screen created with total gold:', totalGoldEarned);
+    }
+    
+    onGameOver() {
+        // Prevent multiple game over screens
+        if (this.gameOverScreenShown) {
+            console.log('Game over screen already shown, ignoring duplicate call');
+            return;
+        }
+        this.gameOverScreenShown = true;
+        
+        // Disable player input during game over screen
+        this.isPlayerTurn = false;
+        
+        // Show CSS glassmorphism defeat overlay
+        const defeatOverlay = document.getElementById('defeat-overlay');
+        const defeatPanel = defeatOverlay.querySelector('.glass-panel');
+        
+        // Position overlay to match canvas bounds
+        this.positionOverlayToCanvas(defeatOverlay);
+        
+        // Show overlay
+        defeatOverlay.style.display = 'block';
+        
+        // Animate panel in
+        setTimeout(() => {
+            defeatPanel.classList.add('show');
+        }, 100);
+        
+        // Restart game after delay or any key press
+        const restartHandler = () => {
+            console.log('Game over screen restarting battle...');
+            // Hide overlay
+            defeatOverlay.style.display = 'none';
+            defeatPanel.classList.remove('show');
+            // Clear event listeners
+            document.removeEventListener('keydown', restartHandler);
+            defeatOverlay.removeEventListener('click', restartHandler);
+            this.scene.scene.start('BattleScene');
+        };
+        
+        // Auto-restart delay
+        setTimeout(restartHandler, 10000);
+        
+        // Delay manual restart to allow game over screen to fully appear
+        setTimeout(() => {
+            // Manual restart with any key (after delay)
+            document.addEventListener('keydown', restartHandler, { once: true });
+            
+            // Manual restart with click on overlay (after delay)
+            defeatOverlay.addEventListener('click', restartHandler, { once: true });
+        }, 1500);
+        
+        console.log('Game over screen created');
+    }
+    
+    positionOverlayToCanvas(overlay) {
+        // Get the actual canvas element
+        const canvas = this.scene.game.canvas;
+        const canvasRect = canvas.getBoundingClientRect();
+        
+        // Position overlay to exactly match the canvas bounds with slight inset to avoid blur bleeding
+        overlay.style.position = 'fixed';
+        overlay.style.top = `${canvasRect.top + 2}px`;
+        overlay.style.left = `${canvasRect.left + 2}px`;
+        overlay.style.width = `${canvasRect.width - 4}px`;
+        overlay.style.height = `${canvasRect.height - 4}px`;
+        overlay.style.borderRadius = '6px'; // Slightly smaller to match inset
+        overlay.style.overflow = 'hidden'; // Contain blur effect
     }
     
     getAliveEnemies() {

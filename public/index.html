@@ -76,11 +76,102 @@
             align-items: center;
             min-height: calc(100vh - 40px);
             padding: 20px;
+            position: relative;
         }
         #game-container canvas {
             border: 2px solid #333;
             border-radius: 8px;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Glassmorphism overlay for victory/defeat screens */
+        .glass-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: none;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        .glass-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(500px, 35vw);
+            height: min(280px, 25vh);
+            min-width: 320px;
+            min-height: 200px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: min(16px, 1.2vw);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: serif;
+            pointer-events: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transition: opacity 0.6s ease;
+        }
+        
+        .glass-panel.show {
+            opacity: 1;
+        }
+        
+        .glass-panel.defeat {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 102, 102, 0.3);
+        }
+        
+        .glass-title {
+            font-size: min(54px, 4.5vw);
+            margin-bottom: min(10px, 0.8vh);
+            font-weight: normal;
+        }
+        
+        .glass-divider {
+            width: min(160px, 12vw);
+            height: 1px;
+            background: rgba(255, 255, 255, 0.4);
+            margin: min(10px, 0.8vh) 0;
+        }
+        
+        .defeat .glass-divider {
+            background: rgba(255, 102, 102, 0.4);
+        }
+        
+        .glass-content {
+            font-size: min(32px, 2.8vw);
+            font-style: italic;
+            margin: min(15px, 1.2vh) 0;
+        }
+        
+        .glass-gold {
+            color: #d4af37;
+        }
+        
+        .glass-continue {
+            font-size: min(18px, 1.6vw);
+            font-style: italic;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: min(15px, 1.2vh);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
         }
     </style>
 </head>
@@ -103,6 +194,25 @@
             </div>
         </div>
     </div>
-    <div id="game-container"></div>
+    <div id="game-container">
+        <!-- Glassmorphism overlays -->
+        <div class="glass-overlay" id="victory-overlay">
+            <div class="glass-panel victory">
+                <div class="glass-title">Victory</div>
+                <div class="glass-divider"></div>
+                <div class="glass-content glass-gold" id="victory-gold">+ 0 gold</div>
+                <div class="glass-continue">press any key</div>
+            </div>
+        </div>
+        
+        <div class="glass-overlay" id="defeat-overlay">
+            <div class="glass-panel defeat">
+                <div class="glass-title">Defeat</div>
+                <div class="glass-divider"></div>
+                <div class="glass-content">Your heroes have fallen</div>
+                <div class="glass-continue">press any key to try again</div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

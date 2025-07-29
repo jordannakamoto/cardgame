@@ -9,9 +9,18 @@ export default class HeroManager {
     // Add hero to party
     addHero(hero) {
         if (this.heroes.length < this.maxPartySize) {
+            console.log(`HeroManager: Adding hero ${hero.name}, existing eventBus:`, !!hero.eventBus);
+            console.log(`Hero ${hero.name} has ${hero.eventSubscriptions?.length || 0} existing subscriptions`);
+            
+            // Clean up any existing event subscriptions first
+            if (hero.eventBus) {
+                hero.cleanup();
+            }
+            
             // Initialize hero with event system
             hero.initialize(this.scene.events);
             this.heroes.push(hero);
+            console.log(`Hero ${hero.name} now has ${hero.eventSubscriptions?.length || 0} subscriptions after initialize`);
             return true;
         }
         return false;

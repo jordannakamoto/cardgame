@@ -29,6 +29,8 @@ export default class Hero {
     // Initialize hero with event system
     initialize(eventBus) {
         this.eventBus = eventBus;
+        // Clear existing abilities before setting up new ones
+        this.abilities = [];
         this.setupAbilities();
         this.subscribeToEvents();
     }
@@ -49,6 +51,7 @@ export default class Hero {
     // Event subscription helper
     subscribe(eventName, callback) {
         if (this.eventBus) {
+            console.log(`Hero ${this.name} subscribing to ${eventName}`);
             this.eventBus.on(eventName, callback);
             this.eventSubscriptions.push({ eventName, callback });
         }
@@ -80,6 +83,9 @@ export default class Hero {
     }
     
     onHandPlayed(data) {
+        console.log(`=== ${this.name} onHandPlayed triggered ===`);
+        console.log('Abilities count:', this.abilities.length);
+        
         // Execute any abilities that should trigger when a hand is played
         const context = {
             targetEnemy: data.targetEnemy,
@@ -89,10 +95,13 @@ export default class Hero {
         };
         
         // Check each ability to see if it should execute
-        this.abilities.forEach(ability => {
+        this.abilities.forEach((ability, index) => {
+            console.log(`Checking ability ${index}:`, ability.name || 'unnamed');
             if (ability.canActivate && ability.canActivate(data.pokerHand, context, this.state)) {
+                console.log(`${this.name} ability ${ability.name} activating!`);
                 // Execute the ability's effects (not just apply)
-                ability.effects.forEach(effect => {
+                ability.effects.forEach((effect, effectIndex) => {
+                    console.log(`Executing effect ${effectIndex} for ${ability.name}`);
                     if (effect.execute) {
                         effect.execute(context, this.state, ability.triggers);
                     }
@@ -203,11 +212,17 @@ export default class Hero {
     // Cleanup when hero is removed
     cleanup() {
         if (this.eventBus) {
+            console.log(`Hero ${this.name} cleaning up ${this.eventSubscriptions.length} event subscriptions`);
+            console.log('Subscriptions to clean:', this.eventSubscriptions.map(s => s.eventName));
+            
             // Unsubscribe from all events
             this.eventSubscriptions.forEach(({ eventName, callback }) => {
+                console.log(`Removing ${this.name} from ${eventName}`);
                 this.eventBus.off(eventName, callback);
             });
             this.eventSubscriptions = [];
+            this.eventBus = null; // Clear the event bus reference
+            console.log(`Hero ${this.name} cleanup complete`);
         }
     }
     

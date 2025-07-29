@@ -9,6 +9,7 @@ import { createHero } from '../heroes/HeroRegistry.js';
 import PartyManager from '../party/PartyManager.js';
 import { UIConfig } from '../config/UIConfig.js';
 import { setCardTheme, getCurrentTheme, getAvailableThemes } from '../config/CardThemes.js';
+import { GlassmorphismShader } from '../shaders/GlassmorphismShader.js';
 
 export default class BattleScene extends Phaser.Scene {
     constructor() {
@@ -29,6 +30,14 @@ export default class BattleScene extends Phaser.Scene {
     }
 
     create() {
+        // Note: Don't remove all event listeners as it breaks the UI system
+        // Instead, rely on individual component cleanup
+        
+        // Register glassmorphism shader
+        if (!this.renderer.pipelines.get('GlassmorphismShader')) {
+            this.renderer.pipelines.add('GlassmorphismShader', new GlassmorphismShader(this.game));
+        }
+        
         // Add battle backdrop
         const screenWidth = this.cameras.main.width;
         const screenHeight = this.cameras.main.height;
@@ -73,8 +82,10 @@ export default class BattleScene extends Phaser.Scene {
         this.createEnemies();
         this.setupEventHandlers();
         
-        // Start battle
-        this.battleManager.startPlayerTurn();
+        // Start battle after a small delay to ensure everything is initialized
+        this.time.delayedCall(100, () => {
+            this.battleManager.startPlayerTurn();
+        });
     }
     
     createUI() {
@@ -982,5 +993,23 @@ Hover over cards for preview`;
 
     update() {
         // Game loop updates if needed
+    }
+    
+    shutdown() {
+        // Clean up any remaining event listeners
+        if (this.battleManager) {
+            this.events.removeListener('enemyDied', this.battleManager.onEnemyDied);
+        }
+        
+        // Clean up hero event subscriptions
+        if (this.heroManager) {
+            this.heroManager.getAllHeroes().forEach(hero => {
+                if (hero.cleanup) {
+                    hero.cleanup();
+                }
+            });
+        }
+        
+        console.log('BattleScene shutdown complete');
     }
 }
