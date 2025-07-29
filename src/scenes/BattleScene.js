@@ -6,22 +6,51 @@ import Inventory from '../inventory/Inventory.js';
 import { EnemyTypes, EnemyFactory } from '../battle/EnemyTypes.js';
 import HeroManager from '../heroes/HeroManager.js';
 import StarterHero from '../heroes/heroes/StarterHero.js';
+import PartyManager from '../party/PartyManager.js';
 
 export default class BattleScene extends Phaser.Scene {
     constructor() {
         super({ key: 'BattleScene' });
     }
 
+    init(data) {
+        // Receive data from previous scene (like shop)
+        if (data && data.inventory) {
+            this.inventory = data.inventory;
+        }
+        if (data && data.gold !== undefined) {
+            // Gold will be set in inventory
+        }
+        if (data && data.partyManager) {
+            this.partyManager = data.partyManager;
+        }
+    }
+
     create() {
         // Initialize managers
         this.cardManager = new CardManager(this);
         this.battleManager = new BattleManager(this);
-        this.inventory = new Inventory();
+        if (!this.inventory) {
+            this.inventory = new Inventory();
+        }
+        
+        // Initialize party manager if not provided
+        if (!this.partyManager) {
+            this.partyManager = new PartyManager(this);
+            // Create starter hero
+            const starterHero = new StarterHero();
+            this.partyManager.purchaseHero(starterHero);
+        }
+        
         this.heroManager = new HeroManager(this);
         
-        // Create starter hero
-        const starterHero = new StarterHero();
-        this.heroManager.addHero(starterHero);
+        // Sync heroes from party manager to hero manager
+        const partyHeroes = this.partyManager.getAllHeroes();
+        console.log('Syncing heroes from PartyManager to HeroManager:', partyHeroes.length, partyHeroes.map(h => h.name));
+        partyHeroes.forEach(hero => {
+            const success = this.heroManager.addHero(hero);
+            console.log(`Added ${hero.name} to HeroManager:`, success);
+        });
         
         // Create deck
         this.cardManager.createDeck();
@@ -140,6 +169,25 @@ export default class BattleScene extends Phaser.Scene {
         );
         this.manaDisplay.setOrigin(0, 0.5);
         
+        // Sort toggle button (positioned to the right of card hand area)
+        this.sortButton = this.add.text(
+            screenWidth / 2 + 700,
+            screenHeight - 40,
+            'Sort: Suit',
+            {
+                fontSize: '28px',
+                color: '#ffffff',
+                fontFamily: 'Arial',
+                backgroundColor: '#333333',
+                padding: { x: 20, y: 12 }
+            }
+        );
+        this.sortButton.setOrigin(0.5);
+        this.sortButton.setInteractive();
+        this.sortButton.on('pointerdown', () => this.battleManager.toggleSortMode());
+        this.sortButton.on('pointerover', () => this.sortButton.setTint(0xdddddd));
+        this.sortButton.on('pointerout', () => this.sortButton.clearTint());
+        
         this.updateHeroDisplay();
         this.createHeroPortraits();
     }
@@ -177,9 +225,17 @@ export default class BattleScene extends Phaser.Scene {
         // Listen for hero changes
         this.events.on('activeHeroChanged', this.updateHeroPortraits, this);
         
+        // Listen for sort mode changes
+        this.events.on('sortModeChanged', this.updateSortButtonText, this);
+        
         // Info menu toggle with 'I' key
         this.input.keyboard.on('keydown-I', () => {
             this.toggleInfoMenu();
+        });
+        
+        // Sort toggle with 'S' key
+        this.input.keyboard.on('keydown-S', () => {
+            this.battleManager.toggleSortMode();
         });
     }
     
@@ -206,6 +262,7 @@ Arrow Keys - Target Enemy
 1-8 Keys - Select Cards (or click cards)
 ENTER - Attack with selected cards
 SPACE - Draw new hand
+S - Toggle sort mode (Rank/Suit)
 I - Toggle this menu
 
 Game Info:
@@ -372,7 +429,7 @@ Hover over cards for preview`;
     
     updateHandPreview(cards, selectedCards) {
         if (selectedCards.length === 0) {
-            this.handPreview.setText('Select cards to see hand preview');
+            this.handPreview.setText('');
             // Clear damage preview when no cards selected
             this.clearAllDamagePreview();
             // Clear hero activation indicator
@@ -396,9 +453,19 @@ Hover over cards for preview`;
                 // Calculate hero modified damage
                 let finalDamage = baseDamage;
                 let heroModified = false;
+                const currentTarget = battleManager.getCurrentTarget();
+                
+                // Only calculate damage if target is alive
+                if (!currentTarget || !currentTarget.isAlive || currentTarget.currentHealth <= 0) {
+                    this.handPreview.setText('');
+                    this.clearAllDamagePreview();
+                    this.updateHeroActivationIndicator(false);
+                    return;
+                }
+                
                 if (this.scene.get('BattleScene').heroManager) {
                     finalDamage = this.scene.get('BattleScene').heroManager.calculateDamageWithHero(baseDamage, pokerHand, {
-                        targetEnemy: battleManager.getCurrentTarget(),
+                        targetEnemy: currentTarget,
                         selectedCards: selectedCardObjects
                     });
                     heroModified = finalDamage !== baseDamage;
@@ -431,8 +498,8 @@ Hover over cards for preview`;
             enemy.hideDamagePreview();
         });
         
-        // Then show preview on current target
-        if (targetEnemy && targetEnemy.isAlive) {
+        // Then show preview on current target only if it's alive
+        if (targetEnemy && targetEnemy.isAlive && targetEnemy.currentHealth > 0) {
             targetEnemy.showDamagePreview(damage);
         }
     }
@@ -588,6 +655,11 @@ Hover over cards for preview`;
         this.manaDisplay.setText(`Mana: ${current}/${max}`);
     }
     
+    updateSortButtonText(sortByRank) {
+        // Show what mode it will switch TO, not what it's currently on
+        this.sortButton.setText(sortByRank ? 'Sort: Suit' : 'Sort: Rank');
+    }
+    
     createHeroPortraits() {
         this.updateHeroPortraits();
     }
@@ -658,12 +730,14 @@ Hover over cards for preview`;
                 this.updateHeroDisplay();
             });
             
-            // Add hover effect
+            // Add hover effect with tooltip
             portraitBg.on('pointerover', () => {
                 portraitContainer.setScale(1.05);
+                this.showHeroTooltip(hero, portraitContainer);
             });
             portraitBg.on('pointerout', () => {
                 portraitContainer.setScale(1.0);
+                this.hideHeroTooltip();
             });
             
             // Add to main container
@@ -671,6 +745,89 @@ Hover over cards for preview`;
         });
     }
     
+    showHeroTooltip(hero, portraitContainer) {
+        // Clear any existing tooltip
+        this.hideHeroTooltip();
+        
+        // Calculate tooltip position
+        const tooltipX = this.heroPortraitsContainer.x + portraitContainer.x;
+        const tooltipY = this.heroPortraitsContainer.y + portraitContainer.y - 120;
+        
+        // Create tooltip container
+        this.heroTooltip = this.add.container(tooltipX, tooltipY);
+        
+        // Tooltip background
+        const tooltipWidth = 320;
+        const tooltipHeight = 150;
+        const tooltipBg = this.add.graphics();
+        tooltipBg.fillStyle(0x000000, 0.9);
+        tooltipBg.fillRoundedRect(-tooltipWidth/2, -tooltipHeight/2, tooltipWidth, tooltipHeight, 8);
+        tooltipBg.lineStyle(2, 0xffff00, 0.8);
+        tooltipBg.strokeRoundedRect(-tooltipWidth/2, -tooltipHeight/2, tooltipWidth, tooltipHeight, 8);
+        
+        // Hero name
+        const nameText = this.add.text(0, -50, hero.name, {
+            fontSize: '18px',
+            color: '#ffff00',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            align: 'center'
+        });
+        nameText.setOrigin(0.5);
+        
+        // Abilities (main focus in new system)
+        let yOffset = -20;
+        const tooltipElements = [tooltipBg, nameText];
+        
+        if (hero.abilities && hero.abilities.length > 0) {
+            hero.abilities.forEach(ability => {
+                const abilityText = this.add.text(0, yOffset, ability.description, {
+                    fontSize: '16px',
+                    color: '#ff8800',
+                    fontFamily: 'Arial',
+                    align: 'center',
+                    wordWrap: { width: tooltipWidth - 20 }
+                });
+                abilityText.setOrigin(0.5);
+                tooltipElements.push(abilityText);
+                yOffset += 25;
+            });
+        } else {
+            // Fallback for heroes without abilities
+            const noAbilityText = this.add.text(0, yOffset, 'No special abilities', {
+                fontSize: '14px',
+                color: '#666666',
+                fontFamily: 'Arial',
+                align: 'center'
+            });
+            noAbilityText.setOrigin(0.5);
+            tooltipElements.push(noAbilityText);
+            yOffset += 20;
+        }
+        
+        // Add all elements to tooltip
+        this.heroTooltip.add(tooltipElements);
+        
+        // Animate tooltip appearance
+        this.heroTooltip.setAlpha(0);
+        this.tweens.add({
+            targets: this.heroTooltip,
+            alpha: 1,
+            duration: 200,
+            ease: 'Power2'
+        });
+        
+        // Bring tooltip to front
+        this.children.bringToTop(this.heroTooltip);
+    }
+    
+    hideHeroTooltip() {
+        if (this.heroTooltip) {
+            this.heroTooltip.destroy();
+            this.heroTooltip = null;
+        }
+    }
+
     update() {
         // Game loop updates if needed
     }

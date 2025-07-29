@@ -9,6 +9,8 @@ export default class HeroManager {
     // Add hero to party
     addHero(hero) {
         if (this.heroes.length < this.maxPartySize) {
+            // Initialize hero with event system
+            hero.initialize(this.scene.events);
             this.heroes.push(hero);
             return true;
         }
@@ -19,6 +21,9 @@ export default class HeroManager {
     removeHero(heroId) {
         const index = this.heroes.findIndex(h => h.id === heroId);
         if (index !== -1) {
+            const hero = this.heroes[index];
+            // Cleanup hero event subscriptions
+            hero.cleanup();
             this.heroes.splice(index, 1);
             if (this.activeHeroIndex >= this.heroes.length) {
                 this.activeHeroIndex = Math.max(0, this.heroes.length - 1);

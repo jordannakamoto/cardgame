@@ -10,6 +10,7 @@ export default class BattleManager {
         this.selectedCards = [];
         this.isPlayerTurn = true;
         this.battleWon = false;
+        this.sortByRank = true; // true = by rank, false = by suit
         
         // Damage multipliers for poker hands
         this.damageTable = {
@@ -89,8 +90,11 @@ export default class BattleManager {
     }
     
     selectEnemy(index) {
-        // Clear previous selection
-        this.enemies.forEach(enemy => enemy.setTargeted(false));
+        // Clear previous selection and damage previews
+        this.enemies.forEach(enemy => {
+            enemy.setTargeted(false);
+            enemy.hideDamagePreview();
+        });
         
         // Select new enemy
         if (index >= 0 && index < this.enemies.length && this.enemies[index].isAlive) {
@@ -106,8 +110,32 @@ export default class BattleManager {
     
     setPlayerHand(cards) {
         this.playerHand = cards;
+        this.sortHand();
         this.selectedCards = [];
-        this.scene.events.emit('handChanged', cards, this.selectedCards);
+        this.scene.events.emit('handChanged', this.playerHand, this.selectedCards);
+    }
+    
+    sortHand() {
+        if (this.sortByRank) {
+            // Sort by rank descending (A, K, Q, J, 10, 9, 8, 7, 6, 5, 4, 3, 2)
+            this.playerHand.sort((a, b) => b.value - a.value);
+        } else {
+            // Sort by suit (Spades, Hearts, Diamonds, Clubs) then by rank descending within each suit
+            const suitOrder = { 'Spades': 0, 'Hearts': 1, 'Diamonds': 2, 'Clubs': 3 };
+            this.playerHand.sort((a, b) => {
+                if (suitOrder[a.suit] !== suitOrder[b.suit]) {
+                    return suitOrder[a.suit] - suitOrder[b.suit];
+                }
+                return b.value - a.value; // Within same suit, rank descending
+            });
+        }
+    }
+    
+    toggleSortMode() {
+        this.sortByRank = !this.sortByRank;
+        this.sortHand();
+        this.scene.events.emit('handChanged', this.playerHand, this.selectedCards);
+        this.scene.events.emit('sortModeChanged', this.sortByRank);
     }
     
     toggleCardSelection(cardIndex) {
@@ -154,12 +182,24 @@ export default class BattleManager {
         const pokerHand = new PokerHand(selectedCards);
         const damage = this.calculateDamage(pokerHand);
         
+        // Emit handPlayed event for heroes
+        this.scene.events.emit('handPlayed', {
+            pokerHand: pokerHand,
+            selectedCards: selectedCards,
+            baseDamage: damage,
+            targetEnemy: targetEnemy,
+            enemyCount: this.enemies.filter(e => e.isAlive).length,
+            hero: this.scene.heroManager?.getActiveHero(),
+            applyBonus: this.applyHandBonus.bind(this)
+        });
+        
         // Apply hero multiplier if hero manager exists
         let finalDamage = damage;
         if (this.scene.heroManager) {
             finalDamage = this.scene.heroManager.calculateDamageWithHero(damage, pokerHand, {
                 targetEnemy: targetEnemy,
-                selectedCards: selectedCards
+                selectedCards: selectedCards,
+                enemyCount: this.enemies.filter(e => e.isAlive).length
             });
             
             // Generate mana from played cards
@@ -183,6 +223,9 @@ export default class BattleManager {
         this.selectedCards.forEach(index => {
             this.playerHand.splice(index, 1);
         });
+        
+        // Clear damage previews when cards are removed
+        this.enemies.forEach(enemy => enemy.hideDamagePreview());
         
         this.selectedCards = [];
         this.scene.events.emit('handChanged', this.playerHand, this.selectedCards);
@@ -322,6 +365,9 @@ export default class BattleManager {
             if (card) this.playerHand.push(card);
         }
         
+        // Sort the hand after drawing new cards
+        this.sortHand();
+        
         // Clear selection and update display
         this.selectedCards = [];
         this.scene.events.emit('handChanged', this.playerHand, this.selectedCards);
@@ -329,6 +375,12 @@ export default class BattleManager {
     
     endPlayerTurn() {
         this.isPlayerTurn = false;
+        
+        // Emit round end event for heroes
+        this.scene.events.emit('roundEnd', {
+            roundNumber: this.roundNumber || 1,
+            enemiesRemaining: this.enemies.filter(e => e.isAlive).length
+        });
         
         // Simple AI turn - just wait and return to player
         this.scene.time.delayedCall(1000, () => {
@@ -338,13 +390,60 @@ export default class BattleManager {
     
     startPlayerTurn() {
         this.isPlayerTurn = true;
+        
+        // Emit round start event for heroes
+        this.scene.events.emit('roundStart', {
+            roundNumber: this.roundNumber || 1,
+            enemyCount: this.enemies.filter(e => e.isAlive).length,
+            grantExtraResources: this.grantExtraResources.bind(this),
+            offerGoldSpend: this.offerGoldSpend.bind(this)
+        });
+        
         // Only draw new hand if player has no cards
         if (this.playerHand.length === 0) {
             this.drawNewHand();
         }
     }
     
+    // Helper method for heroes to grant extra resources
+    grantExtraResources(resources) {
+        if (resources.hands) {
+            this.handsRemaining = (this.handsRemaining || 5) + resources.hands;
+        }
+        if (resources.discards) {
+            this.discardsRemaining = (this.discardsRemaining || 3) + resources.discards;
+        }
+        // Update UI to reflect changes
+        this.scene.events.emit('resourcesChanged', this.handsRemaining, this.discardsRemaining);
+    }
+    
+    // Helper method for heroes to offer gold spending
+    offerGoldSpend(options) {
+        // This would typically show a UI prompt
+        // For now, we'll auto-accept if player has enough gold
+        const playerGold = this.scene.inventory?.getResource('gold') || 0;
+        if (playerGold >= options.cost) {
+            // Deduct gold and activate effect
+            this.scene.inventory?.addResource('gold', -options.cost);
+            if (options.onAccept) {
+                options.onAccept();
+            }
+            return true;
+        }
+        return false;
+    }
+    
+    // Helper method for heroes to apply bonuses to hands
+    applyHandBonus(bonuses) {
+        // This would apply chips and mult bonuses to the current hand
+        // For now, we'll track them in context for display
+        this.currentHandBonuses = bonuses;
+    }
+    
     onEnemyDied(enemy) {
+        // Clear damage preview from all enemies first
+        this.enemies.forEach(e => e.hideDamagePreview());
+        
         // Check if all enemies are dead
         if (this.getAliveEnemies().length === 0 && !this.battleWon) {
             this.battleWon = true;
@@ -359,6 +458,9 @@ export default class BattleManager {
                 const nextTarget = aliveEnemies[0];
                 const nextIndex = this.enemies.indexOf(nextTarget);
                 this.selectEnemy(nextIndex);
+                
+                // Clear hand preview and hero activation indicator when target dies
+                this.scene.events.emit('handChanged', this.playerHand, []);
             }
         }
     }
@@ -405,6 +507,15 @@ export default class BattleManager {
             duration: 500,
             yoyo: true,
             repeat: -1
+        });
+        
+        // Transition to shop after delay
+        this.scene.time.delayedCall(3000, () => {
+            this.scene.scene.start('ShopScene', {
+                gold: this.scene.inventory.getResource('gold'),
+                inventory: this.scene.inventory,
+                partyManager: this.scene.partyManager
+            });
         });
     }
     

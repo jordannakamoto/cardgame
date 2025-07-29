@@ -37,6 +37,38 @@
         .menu-button.active {
             background-color: #007acc;
         }
+        .debug-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+        .debug-dropdown-content {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: #444;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1001;
+        }
+        .debug-dropdown-content button {
+            color: white;
+            padding: 8px 16px;
+            text-decoration: none;
+            display: block;
+            background: none;
+            border: none;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .debug-dropdown-content button:hover {
+            background-color: #555;
+        }
+        .debug-dropdown:hover .debug-dropdown-content {
+            display: block;
+        }
         #game-container {
             margin-top: 40px;
             display: flex;
@@ -59,6 +91,17 @@
         <button class="menu-button" id="shop-mode">Shop</button>
         <button class="menu-button" id="event-mode">Event</button>
         <button class="menu-button" id="party-mode">Party</button>
+        <div class="debug-dropdown">
+            <button class="menu-button" id="debug-actions">Debug ▼</button>
+            <div class="debug-dropdown-content">
+                <button id="auto-win-battle">Auto Win Battle</button>
+                <button id="add-gold">Add 1000 Gold</button>
+                <button id="heal-all">Heal All</button>  
+                <button id="max-mana">Max Mana All</button>
+                <button id="kill-all-enemies">Kill All Enemies</button>
+                <button id="new-hand">Draw New Hand</button>
+            </div>
+        </div>
     </div>
     <div id="game-container"></div>
 </body>
