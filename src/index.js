@@ -5,6 +5,8 @@ import BattleScene from './scenes/BattleScene.js';
 import ShopScene from './scenes/ShopScene.js';
 import PackOpeningScene from './scenes/PackOpeningScene.js';
 import { DebugMenu } from './ui/DebugMenu.js';
+import { ContextMenu } from './ui/ContextMenu.js';
+import { StickyNote } from './ui/StickyNote.js';
 
 const config = {
     type: Phaser.AUTO,
@@ -43,6 +45,31 @@ const game = new Phaser.Game(config);
 // Make game globally accessible for debug menu
 window.game = game;
 
+// Initialize UI systems
 new DebugMenu();
+new ContextMenu();
+
+// Initialize sticky note system
+window.StickyNoteManager = { StickyNote };
+
+// Focus on game canvas when page loads
+window.addEventListener('load', () => {
+    // Wait a bit for Phaser to fully initialize
+    setTimeout(() => {
+        const canvas = game.canvas;
+        if (canvas) {
+            canvas.tabIndex = 1; // Make it focusable
+            canvas.focus();
+            console.log('Game canvas focused');
+        }
+    }, 100);
+});
+
+// Also focus when clicking on the game container (but not on UI elements)
+document.getElementById('game-container').addEventListener('click', (e) => {
+    if (e.target.tagName === 'CANVAS') {
+        game.canvas.focus();
+    }
+});
 
 export default game;

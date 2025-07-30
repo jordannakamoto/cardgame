@@ -126,6 +126,20 @@ export default class PlayerDeck {
         return hand;
     }
 
+    // Draw a single card (for discards/replacements)
+    drawSingleCard() {
+        const regularCards = this.cards.filter(card => !card.hasModifier('ALWAYS_IN_FIRST_HAND'));
+        
+        if (regularCards.length === 0) {
+            console.warn('No cards available to draw');
+            return null;
+        }
+        
+        // Pick a random card
+        const randomIndex = Math.floor(Math.random() * regularCards.length);
+        return regularCards[randomIndex];
+    }
+    
     // Shuffle array utility
     shuffleArray(array) {
         const shuffled = [...array];

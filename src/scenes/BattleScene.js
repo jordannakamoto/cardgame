@@ -12,6 +12,7 @@ import { UIConfig } from '../config/UIConfig.js';
 import { setCardTheme, getCurrentTheme, getAvailableThemes } from '../config/CardThemes.js';
 import { GlassmorphismShader } from '../shaders/GlassmorphismShader.js';
 import { MysticalEffects } from '../effects/MysticalEffects.js';
+import { cardTraitRegistry } from '../game/CardTraitRegistry.js';
 
 export default class BattleScene extends Phaser.Scene {
     constructor() {
@@ -84,9 +85,15 @@ export default class BattleScene extends Phaser.Scene {
         this.createEnemies();
         this.setupEventHandlers();
         
+        // Initialize card traits for this battle
+        this.initializeCardTraits();
+        
         // Start battle after a small delay to ensure everything is initialized
         this.time.delayedCall(100, () => {
             this.battleManager.startPlayerTurn();
+            
+            // Initialize discard counter display
+            this.updateDiscardCounter(this.battleManager.discardsRemaining, this.battleManager.maxDiscards);
         });
     }
     
@@ -209,6 +216,22 @@ export default class BattleScene extends Phaser.Scene {
         this.sortButton.on('pointerover', () => this.sortButton.setTint(0xdddddd));
         this.sortButton.on('pointerout', () => this.sortButton.clearTint());
         
+        // Discard counter (above theme button)
+        this.discardCounter = this.add.text(
+            screenWidth / 2 + 1050,    // Same x as theme button
+            screenHeight - 200,        // Above theme button
+            'Discards: 1/1',
+            {
+                fontSize: '32px',
+                color: '#ffaa44',
+                fontFamily: 'Arial',
+                backgroundColor: '#333333',
+                padding: { x: 20, y: 12 }
+            }
+        );
+        this.discardCounter.setOrigin(0.5);
+        this.discardCounter.setScrollFactor(0); // Keep fixed to camera
+        
         // Theme toggle button
         this.themeButton = this.add.text(
             screenWidth / 2 + 1050,    // Same x as sort button
@@ -309,6 +332,9 @@ export default class BattleScene extends Phaser.Scene {
         // Listen for sort mode changes
         this.events.on('sortModeChanged', this.updateSortButtonText, this);
         
+        // Listen for discard changes
+        this.events.on('discardsChanged', this.updateDiscardCounter, this);
+        
         // Info menu toggle with 'I' key
         this.input.keyboard.on('keydown-I', () => {
             this.toggleInfoMenu();
@@ -318,6 +344,22 @@ export default class BattleScene extends Phaser.Scene {
         this.input.keyboard.on('keydown-S', () => {
             this.battleManager.toggleSortMode();
         });
+    }
+    
+    // Initialize card traits for this battle session
+    initializeCardTraits() {
+        console.log('Initializing card traits for battle...');
+        
+        // Get all cards from player deck
+        const allCards = this.playerDeck.getAllCards();
+        
+        // Get current party heroes
+        const partyHeroes = this.partyManager.getAllHeroes();
+        
+        // Initialize traits based on active heroes
+        cardTraitRegistry.initializeForBattle(allCards, partyHeroes);
+        
+        console.log(`Card traits initialized for ${allCards.length} cards with ${partyHeroes.length} heroes`);
     }
     
     createInfoMenu() {
@@ -342,6 +384,7 @@ export default class BattleScene extends Phaser.Scene {
 Arrow Keys - Target Enemy
 1-8 Keys - Select Cards (or click cards)
 ENTER - Attack with selected cards
+D - Discard selected cards (limited uses)
 SPACE - Draw new hand
 S - Toggle sort mode (Rank/Suit)
 I - Toggle this menu
@@ -586,7 +629,8 @@ Hover over cards for preview`;
             
             cardContainer.add(containerElements);
             
-            // Store card container for special attack animations
+            // Store card container for special attack animations and attach card data
+            cardContainer.cardData = card; // Attach the card data for animation lookup
             this.cardContainers[index] = cardContainer;
             
             // Make card interactive
@@ -1063,6 +1107,19 @@ Hover over cards for preview`;
         this.sortButton.setText(sortByRank ? 'Sort: Suit' : 'Sort: Rank');
     }
     
+    updateDiscardCounter(remaining, max) {
+        if (this.discardCounter) {
+            this.discardCounter.setText(`Discards: ${remaining}/${max}`);
+            
+            // Change color based on availability
+            if (remaining > 0) {
+                this.discardCounter.setStyle({ color: '#ffaa44' }); // Orange when available
+            } else {
+                this.discardCounter.setStyle({ color: '#888888' }); // Gray when used up
+            }
+        }
+    }
+    
     toggleCardTheme() {
         const themes = getAvailableThemes();
         const currentTheme = getCurrentTheme();
@@ -1077,6 +1134,79 @@ Hover over cards for preview`;
         if (this.battleManager && this.battleManager.playerHand) {
             this.updateHandDisplay(this.battleManager.playerHand, this.battleManager.selectedCards);
         }
+    }
+    
+    animateDiscard(cardsToDiscard, onComplete) {
+        console.log('[ANIM] animateDiscard called with cards:', cardsToDiscard.map(c => c.toString()));
+        console.log('[ANIM] cardContainers:', this.cardContainers ? this.cardContainers.length : 'undefined');
+        
+        // Find the card containers for the cards to discard
+        const discardContainers = [];
+        
+        if (!this.cardContainers) {
+            console.error('[ANIM] No cardContainers found! Calling onComplete immediately.');
+            onComplete();
+            return;
+        }
+        
+        // Debug: log all containers
+        console.log('[ANIM] Available containers:');
+        this.cardContainers.forEach((container, i) => {
+            if (container && container.cardData) {
+                console.log(`  [${i}] ${container.cardData.rank} of ${container.cardData.suit}`);
+            }
+        });
+        
+        cardsToDiscard.forEach(card => {
+            const container = this.cardContainers.find(container => {
+                if (!container || !container.cardData) return false;
+                const matches = container.cardData.rank === card.rank && 
+                               container.cardData.suit === card.suit;
+                if (matches) {
+                    console.log(`[ANIM] Found match for ${card.toString()}`);
+                }
+                return matches;
+            });
+            
+            if (container) {
+                discardContainers.push(container);
+            } else {
+                console.warn(`[ANIM] No container found for card: ${card.toString()}`);
+            }
+        });
+        
+        // Animate each card being discarded
+        let animationsComplete = 0;
+        const totalAnimations = discardContainers.length;
+        
+        if (totalAnimations === 0) {
+            onComplete();
+            return;
+        }
+        
+        discardContainers.forEach((container, index) => {
+            // Stagger the animations
+            this.time.delayedCall(index * 50, () => {
+                // Fade out and move down
+                this.tweens.add({
+                    targets: container,
+                    y: container.y + 200,
+                    alpha: 0,
+                    scaleX: 0.7,
+                    scaleY: 0.7,
+                    rotation: (Math.random() - 0.5) * 0.5,
+                    duration: 400,
+                    ease: 'Power2',
+                    onComplete: () => {
+                        animationsComplete++;
+                        if (animationsComplete === totalAnimations) {
+                            // All animations done, call callback
+                            onComplete();
+                        }
+                    }
+                });
+            });
+        });
     }
     
     createHeroPortraits() {

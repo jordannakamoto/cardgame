@@ -2,6 +2,7 @@ import PokerHand, { HAND_RANKINGS } from '../game/PokerHand.js';
 import Logger from '../logging/Logger.js';
 import { packManager } from '../packs/PackManager.js';
 import { ChainEffects } from '../effects/ChainEffects.js';
+import Card from '../game/Card.js';
 
 export default class BattleManager {
     constructor(scene) {
@@ -19,6 +20,10 @@ export default class BattleManager {
         this.victoryClickHandler = null;
         this.sortByRank = true; // true = by rank, false = by suit
         this.isFirstHandOfBattle = true; // Track if this is the first hand drawn
+        
+        // Discard system
+        this.discardsRemaining = 1; // Default 1 discard per battle
+        this.maxDiscards = 1;
         
         // Damage multipliers for poker hands
         this.damageTable = {
@@ -110,6 +115,13 @@ export default class BattleManager {
         this.scene.input.keyboard.on('keydown-SPACE', () => {
             if (this.isPlayerTurn) {
                 this.endPlayerTurn();
+            }
+        });
+        
+        // D key to discard selected cards
+        this.scene.input.keyboard.on('keydown-D', () => {
+            if (this.isPlayerTurn) {
+                this.performDiscard();
             }
         });
         
@@ -1290,5 +1302,108 @@ export default class BattleManager {
     
     getPlayerHand() {
         return this.playerHand;
+    }
+    
+    // Discard system methods
+    canDiscard() {
+        return this.discardsRemaining > 0 && this.selectedCards.length > 0;
+    }
+    
+    performDiscard() {
+        if (!this.canDiscard()) {
+            console.log('Cannot discard: no discards remaining or no cards selected');
+            return false;
+        }
+        
+        console.log(`[DISCARD] Starting discard process...`);
+        console.log(`[DISCARD] Selected card indices (${this.selectedCards.length}):`, this.selectedCards);
+        console.log(`[DISCARD] Current hand size: ${this.playerHand.length}`);
+        
+        // Convert indices to actual card objects
+        const cardsToDiscard = this.selectedCards.map(index => this.playerHand[index]).filter(card => card);
+        const cardsToAdd = cardsToDiscard.length;
+        
+        console.log(`[DISCARD] Cards to discard:`, cardsToDiscard.map(c => c.toString()));
+        
+        // Clear selection
+        this.selectedCards = [];
+        
+        console.log(`[DISCARD] Will discard ${cardsToAdd} cards`);
+        
+        // Use up one discard immediately (before animation)
+        this.discardsRemaining--;
+        this.scene.events.emit('discardsChanged', this.discardsRemaining, this.maxDiscards);
+        
+        // Animate discard before removing cards
+        console.log(`[DISCARD] Starting animation...`);
+        this.scene.animateDiscard(cardsToDiscard, () => {
+            console.log('Animation complete, removing cards from hand');
+            console.log('Hand before removal:', this.playerHand.length);
+            
+            // After animation, remove cards from hand
+            cardsToDiscard.forEach(card => {
+                // Find card by properties, not reference
+                const index = this.playerHand.findIndex(handCard => 
+                    handCard.rank === card.rank && handCard.suit === card.suit
+                );
+                if (index > -1) {
+                    this.playerHand.splice(index, 1);
+                    console.log(`Removed card: ${card.toString()}`);
+                } else {
+                    console.warn(`Could not find card to remove: ${card.toString()}`);
+                }
+            });
+            
+            console.log('Hand after removal:', this.playerHand.length);
+            
+            // Draw new cards from deck to replace discarded ones
+            if (this.scene.playerDeck) {
+                console.log(`[DISCARD] Drawing ${cardsToAdd} new cards...`);
+                const newCards = [];
+                for (let i = 0; i < cardsToAdd; i++) {
+                    // Draw a single card
+                    const newCard = this.scene.playerDeck.drawSingleCard();
+                    if (newCard) {
+                        // Create a new instance of the card to avoid duplicates
+                        const cardCopy = new Card(newCard.rank, newCard.suit, newCard.value, newCard.rarity);
+                        
+                        // Copy any modifiers
+                        if (newCard.modifiers) {
+                            newCard.modifiers.forEach(mod => {
+                                cardCopy.addModifier({ ...mod });
+                            });
+                        }
+                        
+                        newCards.push(cardCopy);
+                        this.playerHand.push(cardCopy);
+                        console.log(`[DISCARD] Drew: ${cardCopy.toString()}`);
+                    } else {
+                        console.warn(`[DISCARD] Failed to draw card ${i + 1}`);
+                    }
+                }
+                
+                console.log(`[DISCARD] Final hand size: ${this.playerHand.length}`);
+                console.log(`[DISCARD] New cards: ${newCards.map(c => c.toString()).join(', ')}`);
+                
+                // Sort the hand after adding new cards
+                this.sortHand();
+                
+                // Update display with new cards
+                console.log(`[DISCARD] Updating hand display...`);
+                this.scene.updateHandDisplay(this.playerHand, this.selectedCards, true, newCards);
+            } else {
+                console.error(`[DISCARD] No playerDeck available!`);
+            }
+        });
+        
+        console.log(`[DISCARD] Process initiated. Remaining discards: ${this.discardsRemaining}`);
+        return true;
+    }
+    
+    // Method for effects/items to grant additional discards
+    grantDiscards(amount) {
+        this.discardsRemaining += amount;
+        this.maxDiscards += amount;
+        this.scene.events.emit('discardsChanged', this.discardsRemaining, this.maxDiscards);
     }
 }
