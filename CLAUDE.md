@@ -19,7 +19,7 @@ A complete Phaser 3-based card battle game inspired by Balatro + Chrono Ark mech
 
 ### Scene Structure
 ```
-PreloadScene → GameScene → BattleScene (default flow)
+PreloadScene → GameScene → BattleScene → ShopScene → PackOpeningScene (default flow)
 ```
 
 ### Key Components
@@ -66,11 +66,46 @@ PreloadScene → GameScene → BattleScene (default flow)
   - No portrait elevation for reduced visual noise
   - Subtle glow effects behind other UI elements
 
+#### Pack & Card System
+- **Pack** (`src/packs/Pack.js`): Card pack class with generation system
+  - **Card Generation**: Creates realistic playing cards with rarity system
+  - **Rarity Distribution**: Common (60%), Uncommon (25%), Rare (10%), Legendary (5%)
+  - **Special Properties**: Damage bonuses and effects based on rarity tier
+  - **Pack Types**: Basic (5 cards), Premium (better odds), Legendary (3 high-rarity cards)
+- **PackManager** (`src/packs/PackManager.js`): Global pack management
+  - **Shop Integration**: Weighted pack selection for shop inventory
+  - **Battle Rewards**: Automatic pack rewards after battle completion
+- **PackOpeningScene** (`src/scenes/PackOpeningScene.js`): Elegant pack opening experience
+  - **3D Pack Rendering**: Mesh-based pack display with foil shader effects
+  - **Refined Particle Effects**: Subtle dust motes and paper fragments inspired by Expedition 33
+  - **Rarity-Based Animations**: Enhanced visual feedback for legendary/rare cards
+  - **Card Reveal System**: Staggered reveals with minimal shimmer effects
+
 #### Inventory System
 - **Inventory** (`src/inventory/Inventory.js`): Resource management
   - **Resources**: Gold, gems, essence tracking
   - **Item Storage**: 20-slot inventory system
   - **Battle Integration**: Gold rewards from defeated enemies
+  - **Pack Integration**: Cards from opened packs added to inventory
+
+#### Shop System
+- **ShopScene** (`src/scenes/ShopScene.js`): Complete shop experience with 3D pack rendering
+  - **3D Pack Display**: Mesh-based packs with realistic tilt physics responding to mouse position
+  - **Foil Shader Effects**: Directional shimmer that responds to pack tilt angle and amount
+  - **Pack Physics**: "Standing on a pin" effect - mouse position simulates pressing corners
+  - **Reduced Tilt Intensity**: 0.15 radians for subtle, elegant movement
+  - **Shop Inventory**: Randomized selection of 6 items (heroes, equipment, packs)
+  - **Purchase Integration**: Seamless flow from shop to pack opening scene
+
+#### 3D Rendering System
+- **FoilPipeline** (`src/rendering/FoilPipeline.js`): Custom WebGL shader for pack effects
+  - **Directional Foil**: Shimmer follows tilt direction with flow-based calculations
+  - **Tilt Integration**: Shader responds to pack rotation amount and angle
+  - **Cross-hatching**: Perpendicular waves for realistic foil appearance
+  - **Rainbow Interference**: Subtle color variations based on viewing angle
+- **PlaneGeometry**: Proper mesh generation with vertices, UVs, indices, and normals
+  - **Mesh Scaling**: Appropriate sizing (200x280px for pack opening, 320x400px for shop)
+  - **UV Mapping**: Correct texture coordinates for proper image display
 
 #### Mode Management
 - **ModeManager** (`src/managers/ModeManager.js`): Game mode tracking (Battle, Campaign, Shop, Event, Party)
@@ -82,6 +117,30 @@ PreloadScene → GameScene → BattleScene (default flow)
 GOBLIN: { health: 50, goldReward: 8, artPath: 'assets/enemies/goblin1.png' }
 ORC: { health: 80, goldReward: 12, artPath: 'assets/enemies/orc2.png' }  
 TROLL: { health: 120, goldReward: 18, artPath: 'assets/enemies/troll1.png' }
+```
+
+## Current Pack Types
+```javascript
+BASIC_PACK: { 
+  price: 25, cardCount: 5, 
+  guarantees: { common: 3, uncommon: 1, rare: 1 }
+}
+PREMIUM_PACK: { 
+  price: 50, cardCount: 5, 
+  guarantees: { common: 2, uncommon: 2, rare: 1 }
+}
+LEGENDARY_PACK: { 
+  price: 100, cardCount: 3, 
+  guarantees: { rare: 1, legendary: 2 }
+}
+```
+
+## Card Rarity System
+```javascript
+COMMON: { bonus: 0%, color: 0x9e9e9e (gray) }
+UNCOMMON: { bonus: +10% damage, color: 0x4caf50 (green) }
+RARE: { bonus: +25% damage, color: 0x2196f3 (blue) }
+LEGENDARY: { bonus: +50% damage + draw card, color: 0xff9800 (orange) }
 ```
 
 ## Key Features Implemented
@@ -122,7 +181,7 @@ TROLL: { health: 120, goldReward: 18, artPath: 'assets/enemies/troll1.png' }
 ```
 src/
 ├── battle/
-│   ├── BattleManager.js     # Core battle logic with hero integration
+│   ├── BattleManager.js     # Core battle logic with hero integration + pack rewards
 │   ├── Enemy.js             # Enemy entities with mouse targeting
 │   └── EnemyTypes.js        # Enemy definitions & factory
 ├── game/
@@ -140,10 +199,17 @@ src/
 │   └── Logger.js            # Toggleable logging system
 ├── managers/
 │   └── ModeManager.js       # Game mode management
+├── packs/
+│   ├── Pack.js              # Pack class with card generation & rarity system
+│   └── PackManager.js       # Global pack management & shop integration
+├── rendering/
+│   └── FoilPipeline.js      # Custom WebGL shader for 3D pack effects
 ├── scenes/
-│   ├── PreloadScene.js      # Asset loading (enemies + heroes)
+│   ├── PreloadScene.js      # Asset loading (enemies + heroes + packs)
 │   ├── GameScene.js         # Main menu (auto-transitions to battle)
-│   └── BattleScene.js       # Battle UI with hero portraits
+│   ├── BattleScene.js       # Battle UI with hero portraits
+│   ├── ShopScene.js         # Shop with 3D pack physics and foil shaders
+│   └── PackOpeningScene.js  # Elegant pack opening with refined particle effects
 ├── ui/
 │   └── DebugMenu.js         # Debug mode switcher
 └── index.js                 # Game initialization
@@ -156,8 +222,9 @@ test/
 
 public/
 ├── assets/
-│   ├── enemies/            # Enemy artwork
-│   └── heroes/             # Hero portraits (warrior2.png)
+│   ├── enemies/            # Enemy artwork (goblin1.png, orc2.png, troll1.png)
+│   ├── heroes/             # Hero portraits (warrior2.png, mage1.png, etc.)
+│   └── packs/              # Pack artwork (basic1.png, basic2.png, basic3.png)
 └── index.html              # Game container + debug menu bar
 ```
 
@@ -191,7 +258,7 @@ npm run test         # Run all tests
 ```
 
 ## Current State
-The game is a complete card battle system where players use poker hands to damage enemies, enhanced by strategic hero abilities. The core gameplay loop works: draw cards → select cards (1-5) → make poker hands → hero abilities modify damage → deal damage → defeat enemies → earn gold → manage resources. 
+The game is a complete card battle system where players use poker hands to damage enemies, enhanced by strategic hero abilities and a sophisticated pack opening system. The core gameplay loop works: draw cards → select cards (1-5) → make poker hands → hero abilities modify damage → deal damage → defeat enemies → earn gold → visit shop → purchase packs → open packs → collect cards → manage resources.
 
 ### Key Gameplay Features
 - **Strategic Depth**: Hero multipliers add layer of strategy to hand selection
@@ -200,6 +267,8 @@ The game is a complete card battle system where players use poker hands to damag
 - **Interactive Targeting**: Mouse and keyboard support for enemy selection
 - **Resource Management**: Gold-based economy with inventory system
 - **Scalable Hero System**: Framework for adding more heroes with unique abilities
+- **Elegant Pack System**: Refined pack opening experience with 3D mesh rendering and sophisticated particle effects
+- **Card Collection**: Rarity-based card generation with meaningful bonuses and special effects
 
 ### Recent Polish Improvements
 - **Enhanced UI Layout**: Damage preview moved to bottom-left panel for better visibility
@@ -209,5 +278,9 @@ The game is a complete card battle system where players use poker hands to damag
 - **Visual Refinements**: Gold displays use coin symbols (🪙), hero portraits cropped instead of squished
 - **Magic Theme Default**: Rich gradient card backgrounds with ornate decorations
 - **Clean Interface**: Removed visual clutter like card numbers and hero elevation effects
+- **3D Pack Rendering**: Mesh-based pack display with realistic tilt physics and foil shader effects
+- **Refined Pack Opening**: Expedition 33-inspired elegant particle effects (dust motes, paper fragments)
+- **Sophisticated Card Generation**: Complete rarity system with meaningful gameplay bonuses
+- **Shop Integration**: Seamless flow from battle rewards to pack purchasing to card collection
 
 All major systems are implemented, tested, and scaled for high-resolution display. The game is ready for expansion with additional heroes, enemies, items, and game modes.

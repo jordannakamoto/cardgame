@@ -24,6 +24,9 @@ export default class Hero {
         
         // Hero-specific state (e.g., tears, charges, etc.)
         this.state = {};
+        
+        // Special animations for hero abilities
+        this.specialAnimations = new Map();
     }
     
     // Initialize hero with event system
@@ -142,6 +145,25 @@ export default class Hero {
     // Check if any abilities activated in the last calculation
     hasActivatedAbilities() {
         return this.lastActivatedAbilities && this.lastActivatedAbilities.length > 0;
+    }
+    
+    // Set special animation for an ability
+    setSpecialAnimation(abilityName, animationFunction) {
+        this.specialAnimations.set(abilityName, animationFunction);
+    }
+    
+    // Trigger special animation for an ability
+    triggerSpecialAnimation(abilityName, scene, heroSprite, targets) {
+        const animationFunction = this.specialAnimations.get(abilityName);
+        if (animationFunction && typeof animationFunction === 'function') {
+            return animationFunction(scene, heroSprite, targets, this);
+        }
+        return Promise.resolve();
+    }
+    
+    // Check if hero has special animation for an ability
+    hasSpecialAnimation(abilityName) {
+        return this.specialAnimations.has(abilityName);
     }
     
     // Ability system

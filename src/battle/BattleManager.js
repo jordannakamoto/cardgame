@@ -1,6 +1,7 @@
 import PokerHand, { HAND_RANKINGS } from '../game/PokerHand.js';
 import Logger from '../logging/Logger.js';
 import { packManager } from '../packs/PackManager.js';
+import { ChainEffects } from '../effects/ChainEffects.js';
 
 export default class BattleManager {
     constructor(scene) {
@@ -17,6 +18,7 @@ export default class BattleManager {
         this.victoryKeyHandler = null;
         this.victoryClickHandler = null;
         this.sortByRank = true; // true = by rank, false = by suit
+        this.isFirstHandOfBattle = true; // Track if this is the first hand drawn
         
         // Damage multipliers for poker hands
         this.damageTable = {
@@ -231,9 +233,166 @@ export default class BattleManager {
         const targetEnemy = this.enemies[this.selectedEnemyIndex];
         if (!targetEnemy || !targetEnemy.isAlive) return;
         
-        // Get the 5 selected cards
+        // Get the selected cards
         const selectedCards = this.getSelectedCards();
         
+        // Check if any selected card has chain trait
+        const chainCard = selectedCards.find(card => card.hasChain());
+        
+        if (chainCard) {
+            // Handle chain attack
+            this.executeChainAttack(chainCard, selectedCards, targetEnemy);
+        } else {
+            // Handle normal attack
+            this.executeNormalAttack(selectedCards, targetEnemy);
+        }
+    }
+    
+    async executeChainAttack(chainCard, selectedCards, targetEnemy) {
+        console.log('Executing chain attack with', chainCard.toString());
+        
+        // Store reference to chain card in container for visual effects
+        const chainCardIndex = this.selectedCards[selectedCards.indexOf(chainCard)];
+        if (this.scene.cardContainers && this.scene.cardContainers[chainCardIndex]) {
+            this.scene.cardContainers[chainCardIndex].chainCard = chainCard;
+        }
+        
+        const chainData = chainCard.getChainData();
+        const maxChainLinks = chainData.maxChainLinks || 3;
+        
+        // Break down the selected cards into individual chain links
+        const chainHands = this.createChainLinks(selectedCards, targetEnemy);
+        
+        // Get additional hands from remaining cards if we have room
+        const remainingCards = this.playerHand.filter((card, index) => !this.selectedCards.includes(index));
+        const additionalHands = this.findChainableHands(remainingCards, Math.max(0, maxChainLinks - chainHands.length));
+        
+        // Combine all chain links
+        const allHands = [
+            ...chainHands,
+            ...additionalHands.map(handData => ({
+                handName: handData.hand.handName,
+                damage: this.calculateDamageWithHero(handData.hand, targetEnemy, handData.cards),
+                cards: handData.cards,
+                isPrimary: false
+            }))
+        ];
+        
+        const totalDamage = allHands.reduce((sum, hand) => sum + hand.damage, 0);
+        
+        console.log(`Chain attack: ${allHands.length} links, ${totalDamage} total damage`);
+        console.log('Chain links:', allHands.map(h => `${h.handName} (${h.damage})`).join(', '));
+        
+        // Show chain result
+        this.displayChainResult(chainCard, allHands, totalDamage);
+        
+        // Execute dramatic chain attack with visual effects
+        const chainEffectResult = await ChainEffects.executeChainAttack(
+            this.scene, 
+            chainCard, 
+            allHands, 
+            totalDamage, 
+            targetEnemy
+        );
+        
+        // Clean up chain text effects before removing cards
+        this.cleanupChainEffects();
+        
+        // Remove all used cards from hand
+        this.removeSelectedCards();
+        additionalHands.forEach(handData => {
+            this.removeCardsFromHand(handData.cards);
+        });
+        
+        // Clean up chain effect after battle turn
+        this.scene.time.delayedCall(3000, () => {
+            if (chainEffectResult && chainEffectResult.cleanup) {
+                chainEffectResult.cleanup();
+            }
+        });
+    }
+    
+    // Break down selected cards into individual chain links
+    createChainLinks(selectedCards, targetEnemy) {
+        const chainLinks = [];
+        const remainingCards = [...selectedCards];
+        
+        // Remove the chain card from consideration for individual links
+        const chainCardIndex = remainingCards.findIndex(card => card.hasChain && card.hasChain());
+        let chainCard = null;
+        if (chainCardIndex !== -1) {
+            chainCard = remainingCards.splice(chainCardIndex, 1)[0];
+        }
+        
+        // Always break down into individual chain links for dramatic effect
+        // Only keep cards together if they form a very strong poker hand (three of a kind or better)
+        if (remainingCards.length >= 3) {
+            const fullHand = new PokerHand([...remainingCards]);
+            console.log(`Chain debug: ${remainingCards.length} cards, hand type: ${fullHand.handType}`);
+            
+            if (fullHand.handType === 'THREE_OF_A_KIND' || 
+                fullHand.handType === 'STRAIGHT' || 
+                fullHand.handType === 'FLUSH' || 
+                fullHand.handType === 'FULL_HOUSE' || 
+                fullHand.handType === 'FOUR_OF_A_KIND' || 
+                fullHand.handType === 'STRAIGHT_FLUSH' || 
+                fullHand.handType === 'ROYAL_FLUSH') {
+                // Only for very strong hands - keep together
+                console.log('Chain: Keeping strong hand together');
+                chainLinks.push({
+                    handName: fullHand.handName,
+                    damage: this.calculateDamageWithHero(fullHand, targetEnemy, remainingCards),
+                    cards: remainingCards,
+                    isPrimary: true
+                });
+                
+                // Add chain card as separate final link
+                if (chainCard) {
+                    const chainCardHand = new PokerHand([chainCard]);
+                    const chainDamage = this.calculateDamageWithHero(chainCardHand, targetEnemy, [chainCard]);
+                    
+                    chainLinks.push({
+                        handName: `★ Wild Chain`,
+                        damage: chainDamage,
+                        cards: [chainCard],
+                        isPrimary: false
+                    });
+                }
+                
+                return chainLinks;
+            }
+        }
+        
+        // Break down into individual card hits
+        remainingCards.forEach((card, index) => {
+            const cardAsHand = new PokerHand([card]);
+            const damage = this.calculateDamageWithHero(cardAsHand, targetEnemy, [card]);
+            
+            chainLinks.push({
+                handName: `${card.rank} of ${card.suit}`,
+                damage: damage,
+                cards: [card],
+                isPrimary: index === 0
+            });
+        });
+        
+        // Add chain card as final link if it exists
+        if (chainCard) {
+            const chainCardHand = new PokerHand([chainCard]);
+            const chainDamage = this.calculateDamageWithHero(chainCardHand, targetEnemy, [chainCard]);
+            
+            chainLinks.push({
+                handName: `★ Wild Chain`,
+                damage: chainDamage,
+                cards: [chainCard],
+                isPrimary: false
+            });
+        }
+        
+        return chainLinks;
+    }
+    
+    executeNormalAttack(selectedCards, targetEnemy) {
         // Evaluate poker hand
         const pokerHand = new PokerHand(selectedCards);
         const damage = this.calculateDamage(pokerHand);
@@ -265,13 +424,174 @@ export default class BattleManager {
         // Show hand result
         this.displayHandResult(pokerHand, finalDamage);
         
-        // Deal damage
-        targetEnemy.takeDamage(finalDamage);
+        // Check for special attack animations and trigger them
+        const hasSpecialAttacks = selectedCards.some(card => card.hasSpecialAttack());
         
-        // Remove used cards from hand and clear selection
-        this.removeSelectedCards();
+        this.triggerSpecialAttacks(selectedCards, targetEnemy).then(() => {
+            // Deal damage after animations complete
+            targetEnemy.takeDamage(finalDamage, { isSpecialAttack: hasSpecialAttacks });
+            
+            // Remove used cards from hand and clear selection
+            this.removeSelectedCards();
+        });
     }
     
+    // Helper method to calculate damage with hero multipliers
+    calculateDamageWithHero(pokerHand, targetEnemy, selectedCards) {
+        const baseDamage = this.calculateDamage(pokerHand);
+        
+        if (this.scene.heroManager) {
+            return this.scene.heroManager.calculateDamageWithHero(baseDamage, pokerHand, {
+                targetEnemy: targetEnemy,
+                selectedCards: selectedCards,
+                enemyCount: this.enemies.filter(e => e.isAlive).length
+            });
+        }
+        
+        return baseDamage;
+    }
+    
+    // Find additional hands that can be chained from remaining cards
+    findChainableHands(remainingCards, maxLinks) {
+        const chainableHands = [];
+        const usedCardIndices = new Set();
+        
+        // Sort remaining cards by value for better hand finding
+        const sortedCards = remainingCards.map((card, index) => ({ card, originalIndex: index }))
+            .sort((a, b) => b.card.value - a.card.value);
+        
+        for (let linkCount = 0; linkCount < maxLinks && sortedCards.length >= 1; linkCount++) {
+            // Try to find the best hand from remaining unused cards
+            const availableCards = sortedCards.filter(cardData => !usedCardIndices.has(cardData.originalIndex));
+            
+            if (availableCards.length === 0) break;
+            
+            // Try different hand sizes (1-5 cards)
+            let bestHand = null;
+            let bestHandCards = null;
+            let bestHandValue = 0;
+            
+            for (let handSize = Math.min(5, availableCards.length); handSize >= 1; handSize--) {
+                // Try combinations of handSize cards
+                const combinations = this.getCombinations(availableCards, handSize);
+                
+                for (const combination of combinations) {
+                    const cards = combination.map(cardData => cardData.card);
+                    const hand = new PokerHand(cards);
+                    const handValue = HAND_RANKINGS[hand.handType] || 0;
+                    
+                    if (handValue > bestHandValue || (handValue === bestHandValue && handSize > bestHandCards?.length)) {
+                        bestHand = hand;
+                        bestHandCards = combination;
+                        bestHandValue = handValue;
+                    }
+                }
+            }
+            
+            if (bestHand && bestHandCards) {
+                chainableHands.push({
+                    hand: bestHand,
+                    cards: bestHandCards.map(cardData => cardData.card)
+                });
+                
+                // Mark these cards as used
+                bestHandCards.forEach(cardData => usedCardIndices.add(cardData.originalIndex));
+            } else {
+                break; // No more valid hands can be formed
+            }
+        }
+        
+        return chainableHands;
+    }
+    
+    // Get all combinations of specified size from array
+    getCombinations(array, size) {
+        if (size === 1) return array.map(item => [item]);
+        if (size > array.length) return [];
+        
+        const combinations = [];
+        for (let i = 0; i <= array.length - size; i++) {
+            const head = array[i];
+            const tailCombinations = this.getCombinations(array.slice(i + 1), size - 1);
+            tailCombinations.forEach(tail => combinations.push([head, ...tail]));
+        }
+        return combinations;
+    }
+    
+    // Remove specific cards from hand
+    removeCardsFromHand(cardsToRemove) {
+        cardsToRemove.forEach(cardToRemove => {
+            const index = this.playerHand.findIndex(card => 
+                card.rank === cardToRemove.rank && 
+                card.suit === cardToRemove.suit &&
+                card.cardId === cardToRemove.cardId
+            );
+            if (index !== -1) {
+                this.playerHand.splice(index, 1);
+            }
+        });
+        
+        // Update hand display
+        this.scene.events.emit('handChanged', this.playerHand, []);
+    }
+    
+    // Display chain result
+    displayChainResult(chainCard, allHands, totalDamage) {
+        const chainText = `${chainCard.rank} Chain: ${allHands.length} Links`;
+        const damageText = `Total: ${totalDamage} damage`;
+        
+        console.log(chainText);
+        console.log('Chain hands:', allHands.map(h => `${h.handName} (${h.damage})`).join(', '));
+        
+        // You could add UI display here similar to displayHandResult
+    }
+    
+    // Clean up chain text effects from card containers
+    cleanupChainEffects() {
+        if (this.scene.cardContainers) {
+            this.scene.cardContainers.forEach(cardContainer => {
+                if (cardContainer && cardContainer.chainTextEffect) {
+                    cardContainer.chainTextEffect.cleanup();
+                    cardContainer.chainTextEffect = null;
+                }
+            });
+        }
+    }
+    
+    // Trigger special attack animations for cards that have them
+    async triggerSpecialAttacks(cards, targetEnemy) {
+        const specialAttackPromises = [];
+        
+        // Iterate through selected card indices to get the correct card containers
+        for (let i = 0; i < this.selectedCards.length; i++) {
+            const cardIndex = this.selectedCards[i];
+            const card = cards[i]; // cards parameter contains the actual selected cards
+            
+            if (card.hasSpecialAttack()) {
+                // Get the card sprite from the scene for animation using the original hand index
+                const cardSprite = this.getCardSprite(cardIndex);
+                
+                if (cardSprite) {
+                    // For now, single target - but could be extended for AOE
+                    const animationPromise = card.triggerSpecialAttack(this.scene, cardSprite, targetEnemy);
+                    specialAttackPromises.push(animationPromise);
+                }
+            }
+        }
+        
+        // Wait for all special attack animations to complete
+        await Promise.all(specialAttackPromises);
+    }
+    
+    // Helper method to get card sprite by index
+    getCardSprite(cardIndex) {
+        // Get the card container from the scene
+        if (this.scene.cardContainers && this.scene.cardContainers[cardIndex]) {
+            return this.scene.cardContainers[cardIndex];
+        }
+        return null;
+    }
+
     removeSelectedCards() {
         // Remove selected cards from hand (in reverse order to maintain indices)
         this.selectedCards.sort((a, b) => b - a);
@@ -292,14 +612,40 @@ export default class BattleManager {
         // Scale damage based on the highest card values in the hand
         const cardValueBonus = this.calculateCardValueBonus(pokerHand);
         
+        // Add card modifier bonuses
+        const modifierBonus = this.calculateModifierBonus(pokerHand.cards);
+        
         // Safeguard against NaN
-        const totalDamage = baseDamage + cardValueBonus;
+        const totalDamage = baseDamage + cardValueBonus + modifierBonus;
         if (isNaN(totalDamage)) {
-            console.warn('NaN damage detected:', { baseDamage, cardValueBonus, pokerHand });
+            console.warn('NaN damage detected:', { baseDamage, cardValueBonus, modifierBonus, pokerHand });
             return 5; // Fallback to minimum damage
         }
         
         return Math.floor(totalDamage);
+    }
+
+    calculateModifierBonus(cards) {
+        let bonus = 0;
+        
+        cards.forEach(card => {
+            // Add damage bonus from card modifiers
+            if (card.damageBonus) {
+                bonus += card.damageBonus;
+            }
+            
+            // Handle special modifier effects
+            card.modifiers.forEach(modifier => {
+                switch (modifier.type) {
+                    case 'DRAW_EXTRA_CARD':
+                        // This will be handled elsewhere but could add small bonus
+                        break;
+                    // Add more modifier types as needed
+                }
+            });
+        });
+        
+        return bonus;
     }
     
     calculateCardValueBonus(pokerHand) {
@@ -409,23 +755,17 @@ export default class BattleManager {
     }
     
     drawNewHand(animate = false) {
-        if (!this.scene.cardManager) return;
+        if (!this.scene.playerDeck) return;
         
-        // Keep existing cards and only draw new ones to fill to 8
-        const currentHandSize = this.playerHand.length;
-        const cardsToDrawCount = 8 - currentHandSize;
+        // Draw a fresh hand from the player deck (includes special card handling)
+        this.playerHand = this.scene.playerDeck.drawHand(8, this.isFirstHandOfBattle);
         
-        // Track which cards are new before adding them
-        const newCards = [];
-        for (let i = 0; i < cardsToDrawCount; i++) {
-            const card = this.scene.cardManager.drawCard();
-            if (card) {
-                newCards.push(card);
-                this.playerHand.push(card);
-            }
+        // After drawing the first hand, set flag to false
+        if (this.isFirstHandOfBattle) {
+            this.isFirstHandOfBattle = false;
         }
         
-        // Sort the hand after drawing new cards
+        // Sort the hand after drawing new cards  
         this.sortHand();
         
         // Clear selection and update display
@@ -433,8 +773,8 @@ export default class BattleManager {
         
         // Use direct call for animation or event for normal updates
         if (animate) {
-            // Pass the new cards for selective animation
-            this.scene.updateHandDisplay(this.playerHand, this.selectedCards, true, newCards);
+            // Animate all cards since we drew a fresh hand
+            this.scene.updateHandDisplay(this.playerHand, this.selectedCards, true, this.playerHand);
         } else {
             this.scene.events.emit('handChanged', this.playerHand, this.selectedCards);
         }
@@ -801,7 +1141,8 @@ export default class BattleManager {
             this.scene.scene.start('ShopScene', {
                 gold: this.scene.inventory.getResource('gold'),
                 inventory: this.scene.inventory,
-                partyManager: this.scene.partyManager
+                partyManager: this.scene.partyManager,
+                playerDeck: this.scene.playerDeck
             });
         };
         
@@ -863,6 +1204,7 @@ export default class BattleManager {
             this.scene.scene.launch('PackOpeningScene', {
                 pack: rewardPack,
                 inventory: this.scene.inventory,
+                playerDeck: this.scene.playerDeck,
                 onComplete: (revealedCards) => {
                     console.log('Battle reward pack opened! Revealed cards:', revealedCards);
                 }

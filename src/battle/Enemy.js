@@ -102,7 +102,7 @@ export default class Enemy {
         this.makeInteractive();
     }
     
-    takeDamage(amount) {
+    takeDamage(amount, options = {}) {
         if (!this.isAlive) return;
         
         // Clear damage preview before applying damage
@@ -110,6 +110,12 @@ export default class Enemy {
         
         this.currentHealth = Math.max(0, this.currentHealth - amount);
         this.updateHealthBar();
+        
+        // Screen shake for special attacks
+        if (options.isSpecialAttack) {
+            const camera = this.scene.cameras.main;
+            camera.shake(200, 0.008); // More noticeable shake when damage is applied
+        }
         
         // Create damage text
         const damageText = this.scene.add.text(this.x, this.y - 90, `-${amount}`, {  // 60 * 1.5

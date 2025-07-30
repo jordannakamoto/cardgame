@@ -27,7 +27,7 @@ export default class PartyManager {
 
         // Remove from available and add to party
         this.availableHeroes = this.availableHeroes.filter(h => h.id !== heroId);
-        this.party.addHero(hero);
+        this.party.addHero(hero, this.scene.playerDeck);
         
         console.log('Hero added to party successfully:', hero.name || hero.id);
         console.log('Party size after add:', this.party.getSize());

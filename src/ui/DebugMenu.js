@@ -82,14 +82,20 @@ export class DebugMenu {
                 if (activeScenes.length > 0) {
                     const currentScene = activeScenes[0];
                     // Import PartyManager dynamically to avoid circular imports
-                    import('../party/PartyManager.js').then(module => {
-                        const PartyManager = module.default;
+                    Promise.all([
+                        import('../party/PartyManager.js'),
+                        import('../game/PlayerDeck.js')
+                    ]).then(([partyModule, deckModule]) => {
+                        const PartyManager = partyModule.default;
+                        const PlayerDeck = deckModule.default;
                         const debugPartyManager = new PartyManager(currentScene);
+                        const debugPlayerDeck = new PlayerDeck();
                         
                         currentScene.scene.start('ShopScene', {
                             gold: 150,
                             inventory: debugInventory,
-                            partyManager: debugPartyManager
+                            partyManager: debugPartyManager,
+                            playerDeck: debugPlayerDeck
                         });
                     });
                 }

@@ -31,6 +31,7 @@ export default class ShopScene extends Phaser.Scene {
         this.playerGold = data.gold || 0;
         this.inventory = data.inventory || new Inventory();
         this.partyManager = data.partyManager || null;
+        this.playerDeck = data.playerDeck || null;
 
         // Create party manager if not provided
         if (!this.partyManager) {
@@ -748,9 +749,10 @@ export default class ShopScene extends Phaser.Scene {
         this.scene.launch('PackOpeningScene', {
             pack: packData,
             inventory: this.inventory,
+            playerDeck: this.playerDeck,
             onComplete: (revealedCards) => {
                 console.log('Pack opened! Revealed cards:', revealedCards);
-                // Pack opening scene will handle adding cards to inventory
+                // Pack opening scene will handle adding cards to inventory and deck
             }
         });
     }

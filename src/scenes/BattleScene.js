@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import CardManager from '../game/CardManager.js';
+import PlayerDeck from '../game/PlayerDeck.js';
 import BattleManager from '../battle/BattleManager.js';
 import Enemy from '../battle/Enemy.js';
 import Inventory from '../inventory/Inventory.js';
@@ -10,6 +11,7 @@ import PartyManager from '../party/PartyManager.js';
 import { UIConfig } from '../config/UIConfig.js';
 import { setCardTheme, getCurrentTheme, getAvailableThemes } from '../config/CardThemes.js';
 import { GlassmorphismShader } from '../shaders/GlassmorphismShader.js';
+import { MysticalEffects } from '../effects/MysticalEffects.js';
 
 export default class BattleScene extends Phaser.Scene {
     constructor() {
@@ -51,6 +53,7 @@ export default class BattleScene extends Phaser.Scene {
         
         // Initialize managers
         this.cardManager = new CardManager(this);
+        this.playerDeck = new PlayerDeck();
         this.battleManager = new BattleManager(this);
         if (!this.inventory) {
             this.inventory = new Inventory();
@@ -74,9 +77,8 @@ export default class BattleScene extends Phaser.Scene {
             console.log(`Added ${hero.name} to HeroManager:`, success);
         });
         
-        // Create deck
-        this.cardManager.createDeck();
-        this.cardManager.shuffleDeck();
+        // Initialize CardManager for visual rendering only
+        this.cardManager.createDeck(); // Keep for compatibility with card rendering methods
         
         this.createUI();
         this.createEnemies();
@@ -400,15 +402,30 @@ Hover over cards for preview`;
         // Update hand preview
         this.updateHandPreview(cards, selectedCards);
         
+        // Store previous selection state to avoid replaying animations
+        if (!this.previousSelectedCards) this.previousSelectedCards = [];
+        
+        // Check if we can optimize by only updating selection states instead of re-rendering everything
+        if (this.canOptimizeSelection(cards, selectedCards, forceAnimation, newCards)) {
+            this.updateCardSelectionStates(cards, selectedCards);
+            this.previousSelectedCards = [...selectedCards];
+            return;
+        }
+        
+        // Full re-render needed - clean up mystical effects first
+        this.cleanupMysticalEffects();
+        
+        // Clear previous hand display
+        this.handCardsContainer.removeAll(true);
+        
         // Display cards
         const cardSpacing = UIConfig.card.spacing;  // Now 210
         const startX = -(cards.length - 1) * cardSpacing / 2;
         
-        // Store previous selection state to avoid replaying animations
-        if (!this.previousSelectedCards) this.previousSelectedCards = [];
-        
-        // Clear previous hand display
-        this.handCardsContainer.removeAll(true);
+        // Store card containers for special attack animations
+        this.cardContainers = [];
+        // Store active mystical effects for cleanup
+        this.activeMysticalEffects = [];
         
         // Determine which cards should animate
         if (forceAnimation && newCards.length > 0) {
@@ -499,19 +516,46 @@ Hover over cards for preview`;
             cardData.topRankText.y -= cardHeight/2;
             cardData.topSuitText.x -= cardWidth/2;
             cardData.topSuitText.y -= cardHeight/2;
-            cardData.bottomRankText.x -= cardWidth/2;
-            cardData.bottomRankText.y -= cardHeight/2;
-            cardData.bottomSuitText.x -= cardWidth/2;
-            cardData.bottomSuitText.y -= cardHeight/2;
-            cardData.centerSuitText.x -= cardWidth/2;
-            cardData.centerSuitText.y -= cardHeight/2;
             
-            // Add selection highlight
+            // Only adjust centerSuitText position if it exists
+            if (cardData.centerSuitText) {
+                cardData.centerSuitText.x -= cardWidth/2;
+                cardData.centerSuitText.y -= cardHeight/2;
+            }
+            
+            // Adjust artwork position if it exists (for joker cards)
+            if (cardData.artwork) {
+                cardData.artwork.x -= cardWidth/2;
+                cardData.artwork.y -= cardHeight/2;
+            }
+            
+            // Add selection shadow
             if (isSelected) {
-                const highlight = this.add.graphics();
-                highlight.lineStyle(6, 0xffffff);
-                highlight.strokeRoundedRect(-cardWidth/2 - 3, -cardHeight/2 - 3, cardWidth + 6, cardHeight + 6, 8);
-                cardContainer.add(highlight);
+                const shadow = this.add.graphics();
+                shadow.fillStyle(0x000000, 0.4);
+                shadow.fillEllipse(0, cardHeight/2 + 15, cardWidth * 0.8, 20); // Shadow beneath card
+                shadow.setDepth(-1); // Behind the card
+                cardContainer.add(shadow);
+                
+                // Add mystical effect for joker cards
+                const card = cards[index];
+                if (card && card.rank === 'Joker' && card.suit === 'Wild') {
+                    const mysticalEffect = MysticalEffects.createJokerSelectionEffect(this, cardContainer);
+                    // Store reference for cleanup when card is deselected
+                    cardContainer.mysticalEffect = mysticalEffect;
+                    this.activeMysticalEffects.push(mysticalEffect);
+                }
+            } else {
+                // Cleanup mystical effect when card is deselected
+                if (cardContainer.mysticalEffect) {
+                    cardContainer.mysticalEffect.cleanup();
+                    // Remove from active effects array
+                    const effectIndex = this.activeMysticalEffects.indexOf(cardContainer.mysticalEffect);
+                    if (effectIndex > -1) {
+                        this.activeMysticalEffects.splice(effectIndex, 1);
+                    }
+                    cardContainer.mysticalEffect = null;
+                }
             }
             
             // Card number indicator (hidden for cleaner look)
@@ -523,15 +567,27 @@ Hover over cards for preview`;
             // });
             // numberText.setOrigin(0.5);
             
-            // Add elements to container (without numberText)
-            cardContainer.add([
+            // Add elements to container
+            const containerElements = [
                 cardData.graphics,
                 cardData.topRankText,
-                cardData.topSuitText,
-                cardData.bottomRankText,
-                cardData.bottomSuitText,
-                cardData.centerSuitText
-            ]);
+                cardData.topSuitText
+            ];
+            
+            // Add center suit text if it exists (not for joker cards with artwork)
+            if (cardData.centerSuitText) {
+                containerElements.push(cardData.centerSuitText);
+            }
+            
+            // Add artwork if it exists (for joker cards)
+            if (cardData.artwork) {
+                containerElements.push(cardData.artwork);
+            }
+            
+            cardContainer.add(containerElements);
+            
+            // Store card container for special attack animations
+            this.cardContainers[index] = cardContainer;
             
             // Make card interactive
             cardData.graphics.setInteractive(new Phaser.Geom.Rectangle(0, 0, cardWidth, cardHeight), Phaser.Geom.Rectangle.Contains);
@@ -555,6 +611,181 @@ Hover over cards for preview`;
         this.previousSelectedCards = [...selectedCards];
     }
     
+    canOptimizeSelection(cards, selectedCards, forceAnimation, newCards) {
+        // Can't optimize if we need to force animation or have new cards
+        if (forceAnimation || (newCards && newCards.length > 0)) {
+            return false;
+        }
+        
+        // Can't optimize if we don't have existing card containers
+        if (!this.cardContainers || this.cardContainers.length === 0) {
+            return false;
+        }
+        
+        // Can't optimize if the number of cards changed
+        if (!this.previousCards || this.previousCards.length !== cards.length) {
+            return false;
+        }
+        
+        // Can't optimize if the actual cards changed (different ranks/suits)
+        for (let i = 0; i < cards.length; i++) {
+            if (!this.previousCards[i] || 
+                this.previousCards[i].rank !== cards[i].rank || 
+                this.previousCards[i].suit !== cards[i].suit) {
+                return false;
+            }
+        }
+        
+        // We can optimize - only selection states are changing
+        return true;
+    }
+    
+    updateCardSelectionStates(cards, selectedCards) {
+        if (!this.cardContainers) return;
+        
+        cards.forEach((card, index) => {
+            const cardContainer = this.cardContainers[index];
+            if (!cardContainer) return;
+            
+            const isSelected = selectedCards.includes(index);
+            const wasSelected = this.previousSelectedCards.includes(index);
+            const baseCardY = 0;
+            
+            // Only update if selection state actually changed
+            if (isSelected !== wasSelected) {
+                // Remove old selection shadow
+                const existingShadow = cardContainer.list.find(child => child.isShadow);
+                if (existingShadow) {
+                    existingShadow.destroy();
+                }
+                
+                // Clean up old mystical effect
+                if (cardContainer.mysticalEffect) {
+                    cardContainer.mysticalEffect.cleanup();
+                    const effectIndex = this.activeMysticalEffects.indexOf(cardContainer.mysticalEffect);
+                    if (effectIndex > -1) {
+                        this.activeMysticalEffects.splice(effectIndex, 1);
+                    }
+                    cardContainer.mysticalEffect = null;
+                }
+                
+                // Clean up old chain text effect
+                if (cardContainer.chainTextEffect) {
+                    cardContainer.chainTextEffect.cleanup();
+                    cardContainer.chainTextEffect = null;
+                }
+                
+                if (isSelected) {
+                    // Add selection shadow
+                    const cardWidth = UIConfig.card.width;
+                    const cardHeight = UIConfig.card.height;
+                    const shadow = this.add.graphics();
+                    shadow.fillStyle(0x000000, 0.4);
+                    shadow.fillEllipse(0, cardHeight/2 + 15, cardWidth * 0.8, 20); // Shadow beneath card
+                    shadow.setDepth(-1); // Behind the card
+                    shadow.isShadow = true; // Mark for identification
+                    cardContainer.add(shadow);
+                    
+                    // Add mystical effect for joker cards
+                    if (card && card.rank === 'Joker' && card.suit === 'Wild') {
+                        const mysticalEffect = MysticalEffects.createJokerSelectionEffect(this, cardContainer);
+                        cardContainer.mysticalEffect = mysticalEffect;
+                        this.activeMysticalEffects.push(mysticalEffect);
+                    }
+                    
+                    // Add chain text for chain cards
+                    if (card && card.hasChain && card.hasChain()) {
+                        const chainTextEffect = this.createChainSelectionText(cardContainer);
+                        cardContainer.chainTextEffect = chainTextEffect;
+                    }
+                    
+                    // Animate to selected position
+                    this.tweens.add({
+                        targets: cardContainer,
+                        y: baseCardY - 30,
+                        duration: 200,
+                        ease: 'Back.out'
+                    });
+                } else {
+                    // Animate to unselected position
+                    this.tweens.add({
+                        targets: cardContainer,
+                        y: baseCardY,
+                        duration: 200,
+                        ease: 'Back.out'
+                    });
+                }
+            }
+        });
+    }
+    
+    cleanupMysticalEffects() {
+        if (this.activeMysticalEffects) {
+            this.activeMysticalEffects.forEach(effect => {
+                if (effect && effect.cleanup) {
+                    effect.cleanup();
+                }
+            });
+            this.activeMysticalEffects = [];
+        }
+    }
+    
+    createChainSelectionText(cardContainer) {
+        const worldTransform = cardContainer.getWorldTransformMatrix();
+        const cardX = worldTransform.tx;
+        const cardY = worldTransform.ty;
+        
+        // Create stylized "CHAIN" text above the card
+        const chainText = this.add.text(
+            cardX,
+            cardY - 140,
+            'CHAIN',
+            {
+                fontSize: '32px',
+                color: '#ff6600',
+                fontFamily: 'Arial',  
+                fontStyle: 'bold italic',
+                stroke: '#000000',
+                strokeThickness: 3
+            }
+        );
+        chainText.setOrigin(0.5);
+        chainText.setDepth(10000);
+        chainText.setRotation(-0.15); // Slight slant
+        chainText.setAlpha(0);
+        
+        // Animate in
+        this.tweens.add({
+            targets: chainText,
+            alpha: 0.9,
+            y: cardY - 150,
+            scaleX: { from: 0.5, to: 1.0 },
+            scaleY: { from: 0.5, to: 1.0 },
+            duration: 200,
+            ease: 'Back.out'
+        });
+        
+        return {
+            element: chainText,
+            cleanup: () => {
+                if (chainText && chainText.active) {
+                    // Fade out when deselected
+                    this.tweens.add({
+                        targets: chainText,
+                        alpha: 0,
+                        scaleX: 0.5,
+                        scaleY: 0.5,
+                        duration: 150,
+                        ease: 'Power2',
+                        onComplete: () => {
+                            if (chainText.active) chainText.destroy();
+                        }
+                    });
+                }
+            }
+        };
+    }
+    
     updateHandPreview(cards, selectedCards) {
         if (selectedCards.length === 0) {
             this.handPreview.setText('');
@@ -569,18 +800,13 @@ Hover over cards for preview`;
             // Get selected cards
             const selectedCardObjects = selectedCards.map(index => cards[index]);
             
+            // Check if any selected card has chain trait
+            const chainCard = selectedCardObjects.find(card => card.hasChain && card.hasChain());
+            
             // Import PokerHand dynamically to avoid circular imports
             import('../game/PokerHand.js').then(module => {
                 const PokerHand = module.default;
-                const pokerHand = new PokerHand(selectedCardObjects);
-                
-                // Calculate damage
                 const battleManager = this.scene.get('BattleScene').battleManager;
-                const baseDamage = battleManager.calculateDamage(pokerHand);
-                
-                // Calculate hero modified damage
-                let finalDamage = baseDamage;
-                let heroModified = false;
                 const currentTarget = battleManager.getCurrentTarget();
                 
                 // Only calculate damage if target is alive
@@ -591,34 +817,91 @@ Hover over cards for preview`;
                     return;
                 }
                 
-                // Check which heroes will activate for this hand
-                let activatedHeroes = [];
-                if (this.scene.get('BattleScene').heroManager) {
-                    const context = {
-                        targetEnemy: currentTarget,
-                        selectedCards: selectedCardObjects
-                    };
+                let finalDamage, previewText, activatedHeroes = [];
+                
+                if (chainCard) {
+                    // Calculate chain damage preview
+                    const chainLinks = battleManager.createChainLinks(selectedCardObjects, currentTarget);
                     
-                    // Check each hero individually to see which ones activate
-                    this.scene.get('BattleScene').heroManager.getAllHeroes().forEach(hero => {
-                        const heroMultiplier = hero.calculateMultiplier(pokerHand, context);
-                        if (hero.hasActivatedAbilities()) {
-                            activatedHeroes.push({
-                                hero: hero,
-                                abilities: hero.lastActivatedAbilities
-                            });
-                        }
-                    });
+                    // Get additional hands from remaining cards
+                    const remainingCards = battleManager.playerHand.filter((card, index) => !selectedCards.includes(index));
+                    const chainData = chainCard.getChainData();
+                    const maxChainLinks = chainData.maxChainLinks || 3;
+                    const additionalHands = battleManager.findChainableHands(remainingCards, Math.max(0, maxChainLinks - chainLinks.length));
                     
-                    finalDamage = this.scene.get('BattleScene').heroManager.calculateDamageWithHero(baseDamage, pokerHand, context);
-                    heroModified = finalDamage !== baseDamage;
+                    // Combine all hands for total damage
+                    const allHands = [
+                        ...chainLinks,
+                        ...additionalHands.map(handData => ({
+                            handName: handData.hand.handName,
+                            damage: battleManager.calculateDamageWithHero(handData.hand, currentTarget, handData.cards),
+                            cards: handData.cards
+                        }))
+                    ];
+                    
+                    finalDamage = allHands.reduce((sum, hand) => sum + hand.damage, 0);
+                    
+                    // Create chain preview text
+                    const linkCount = allHands.length;
+                    const primaryHandName = chainLinks[0] ? chainLinks[0].handName : 'Chain';
+                    previewText = `${primaryHandName} Chain (${linkCount} links) : ${finalDamage}`;
+                    
+                    // Check for hero activation (use first chain link for hero calculations)
+                    if (this.scene.get('BattleScene').heroManager && chainLinks.length > 0) {
+                        const firstLinkHand = new PokerHand(chainLinks[0].cards);
+                        const context = {
+                            targetEnemy: currentTarget,
+                            selectedCards: chainLinks[0].cards
+                        };
+                        
+                        this.scene.get('BattleScene').heroManager.getAllHeroes().forEach(hero => {
+                            const heroMultiplier = hero.calculateMultiplier(firstLinkHand, context);
+                            if (hero.hasActivatedAbilities()) {
+                                activatedHeroes.push({
+                                    hero: hero,
+                                    abilities: hero.lastActivatedAbilities
+                                });
+                            }
+                        });
+                    }
+                } else {
+                    // Calculate normal damage
+                    const pokerHand = new PokerHand(selectedCardObjects);
+                    const baseDamage = battleManager.calculateDamage(pokerHand);
+                    
+                    // Calculate hero modified damage
+                    finalDamage = baseDamage;
+                    let heroModified = false;
+                    
+                    // Check which heroes will activate for this hand
+                    if (this.scene.get('BattleScene').heroManager) {
+                        const context = {
+                            targetEnemy: currentTarget,
+                            selectedCards: selectedCardObjects
+                        };
+                        
+                        // Check each hero individually to see which ones activate
+                        this.scene.get('BattleScene').heroManager.getAllHeroes().forEach(hero => {
+                            const heroMultiplier = hero.calculateMultiplier(pokerHand, context);
+                            if (hero.hasActivatedAbilities()) {
+                                activatedHeroes.push({
+                                    hero: hero,
+                                    abilities: hero.lastActivatedAbilities
+                                });
+                            }
+                        });
+                        
+                        finalDamage = this.scene.get('BattleScene').heroManager.calculateDamageWithHero(baseDamage, pokerHand, context);
+                        heroModified = finalDamage !== baseDamage;
+                    }
+                    
+                    // Update preview text with normal format
+                    previewText = `${pokerHand.handName} : ${baseDamage}`;
+                    if (heroModified) {
+                        previewText += ` (+${finalDamage - baseDamage})`;
+                    }
                 }
                 
-                // Update preview text with cleaner format
-                let previewText = `${pokerHand.handName} : ${baseDamage}`;
-                if (heroModified) {
-                    previewText += ` (+${finalDamage - baseDamage})`;
-                }
                 this.handPreview.setText(previewText);
                 
                 // Indicate hero ability activation in portrait
@@ -996,6 +1279,9 @@ Hover over cards for preview`;
     }
     
     shutdown() {
+        // Clean up mystical effects
+        this.cleanupMysticalEffects();
+        
         // Clean up any remaining event listeners
         if (this.battleManager) {
             this.events.removeListener('enemyDied', this.battleManager.onEnemyDied);

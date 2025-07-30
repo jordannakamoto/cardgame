@@ -10,6 +10,7 @@ export default class PackOpeningScene extends Phaser.Scene {
         this.pack = data.pack;
         this.onComplete = data.onComplete || (() => {});
         this.inventory = data.inventory;
+        this.playerDeck = data.playerDeck;
     }
 
     create() {
@@ -639,12 +640,20 @@ export default class PackOpeningScene extends Phaser.Scene {
     }
 
     completePack() {
-        // Add cards to inventory if provided
-        if (this.inventory) {
+        // Add cards to player deck if provided
+        if (this.playerDeck && this.revealedCards) {
+            this.revealedCards.forEach(cardData => {
+                // Add the card directly to the player deck
+                this.playerDeck.addCard(cardData);
+            });
+        }
+
+        // Add cards to inventory as items if provided (for reference/tracking)
+        if (this.inventory && this.revealedCards) {
             this.revealedCards.forEach(card => {
                 this.inventory.addItem({
-                    id: card.id,
-                    name: card.name,
+                    id: card.cardId,
+                    name: card.toString(),
                     type: 'card',
                     rarity: card.rarity,
                     data: card

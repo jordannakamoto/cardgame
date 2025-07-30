@@ -6,7 +6,7 @@ export default class Party {
     }
 
     // Add hero to party
-    addHero(hero) {
+    addHero(hero, playerDeck = null) {
         if (this.heroes.length >= this.maxSize) {
             throw new Error(`Party is full. Maximum size: ${this.maxSize}`);
         }
@@ -21,6 +21,11 @@ export default class Party {
         // Set as active hero if it's the first one
         if (this.heroes.length === 1) {
             this.activeHeroIndex = 0;
+        }
+        
+        // Call hero's onAddedToParty method if it exists
+        if (hero.onAddedToParty && typeof hero.onAddedToParty === 'function' && playerDeck) {
+            hero.onAddedToParty(playerDeck);
         }
         
         return true;

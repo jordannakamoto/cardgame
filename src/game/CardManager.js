@@ -61,8 +61,12 @@ export default class CardManager {
         
         const cornerRadius = Math.max(theme.cornerRadius, cardWidth * 0.04);
         
-        // Card background
-        if (theme.background.gradient) {
+        // Card background - special handling for joker
+        const isJoker = card.rank === 'Joker' && card.suit === 'Wild';
+        if (isJoker) {
+            // Special legendary gradient background for joker
+            this.createJokerBackground(cardGraphics, cardWidth, cardHeight, cornerRadius);
+        } else if (theme.background.gradient) {
             // Create gradient effect for magic theme
             this.createGradientBackground(cardGraphics, cardWidth, cardHeight, cornerRadius, theme);
         } else {
@@ -92,66 +96,105 @@ export default class CardManager {
             this.addMagicDecorations(cardGraphics, cardWidth, cardHeight, theme);
         }
         
+        // Special artwork for joker cards
+        let cardArtwork = null;
+        if (card.rank === 'Joker' && card.suit === 'Wild') {
+            const artKey = 'warrior2_joker';
+            if (this.scene.textures.exists(artKey)) {
+                cardArtwork = this.scene.add.image(
+                    cardWidth / 2, 
+                    cardHeight / 2, 
+                    artKey
+                );
+                
+                // Scale artwork to fill the full card face (minus small border margin)
+                const artScale = Math.min(
+                    (cardWidth * 0.95) / cardArtwork.width,
+                    (cardHeight * 0.9) / cardArtwork.height
+                );
+                cardArtwork.setScale(artScale);
+                cardArtwork.setDepth(1); // Above card background
+                cardArtwork.setAlpha(0.5); // Make more transparent to match other card aesthetics
+            }
+        }
+        
         const color = this.getSuitColor(card.suit, theme);
+        
+        // Special styling for joker cards (isJoker already declared above)
+        const jokerColor = isJoker ? '#FFFFFF' : color; // White color for joker
+        const jokerStyle = isJoker ? {
+            stroke: '#000000',
+            strokeThickness: 3,
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#000000',
+                blur: 6,
+                fill: true
+            }
+        } : {};
         
         const rankFontSize = Math.max(36, cardWidth * 0.18);  // Increased from 0.12 to 0.18
         const suitFontSize = Math.max(48, cardWidth * 0.24);  // Increased from 0.18 to 0.24
         const centerSuitSize = Math.max(80, cardWidth * 0.35); // Increased from 0.25 to 0.35
         
         // Top-left rank and suit
-        const topRankText = this.scene.add.text(x + cardWidth * 0.08, y + cardHeight * 0.06, card.rank, {
-            fontSize: `${rankFontSize}px`,
-            color: color,
+        const displayRank = isJoker ? '★' : card.rank;
+        const topRankText = this.scene.add.text(x + cardWidth * 0.08, y + cardHeight * 0.06, displayRank, {
+            fontSize: `${isJoker ? rankFontSize * 0.8 : rankFontSize}px`,
+            color: jokerColor,
             fontFamily: 'Arial',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            ...jokerStyle
         });
+        if (isJoker) topRankText.setDepth(3); // Above artwork for joker cards
         
-        const topSuitText = this.scene.add.text(x + cardWidth * 0.08, y + cardHeight * 0.16, this.getSuitSymbol(card.suit), {
+        const topSuitText = this.scene.add.text(x + cardWidth * 0.08, y + cardHeight * 0.16, isJoker ? '' : this.getSuitSymbol(card.suit), {
             fontSize: `${suitFontSize}px`,
-            color: color,
-            fontFamily: 'Arial'
-        });
-        
-        // Bottom-right rank and suit (rotated)
-        const bottomRankText = this.scene.add.text(x + cardWidth * 0.92, y + cardHeight * 0.94, card.rank, {
-            fontSize: `${rankFontSize}px`,
-            color: color,
+            color: jokerColor,
             fontFamily: 'Arial',
-            fontStyle: 'bold'
+            ...jokerStyle
         });
-        bottomRankText.setOrigin(1, 1);
-        bottomRankText.setRotation(Math.PI);
+        if (isJoker) topSuitText.setDepth(3); // Above artwork for joker cards
         
-        const bottomSuitText = this.scene.add.text(x + cardWidth * 0.92, y + cardHeight * 0.84, this.getSuitSymbol(card.suit), {
-            fontSize: `${suitFontSize}px`,
-            color: color,
-            fontFamily: 'Arial'
-        });
-        bottomSuitText.setOrigin(1, 1);
-        bottomSuitText.setRotation(Math.PI);
+        // Bottom-right rank and suit removed for cleaner design
         
-        // Large center suit symbol
-        const centerSuitText = this.scene.add.text(x + cardWidth * 0.5, y + cardHeight * 0.5, this.getSuitSymbol(card.suit), {
-            fontSize: `${centerSuitSize}px`,
-            color: color,
-            fontFamily: 'Arial'
-        });
-        centerSuitText.setOrigin(0.5);
-        centerSuitText.setAlpha(0.3); // Make it subtle
+        // Large center suit symbol (skip for joker cards with artwork)
+        let centerSuitText = null;
+        if (!isJoker || !cardArtwork) {
+            const centerSymbol = this.getSuitSymbol(card.suit);
+            centerSuitText = this.scene.add.text(x + cardWidth * 0.5, y + cardHeight * 0.5, centerSymbol, {
+                fontSize: `${centerSuitSize}px`,
+                color: jokerColor,
+                fontFamily: 'Arial',
+                ...jokerStyle
+            });
+            centerSuitText.setOrigin(0.5);
+            centerSuitText.setAlpha(0.3); // Make it subtle for regular cards
+        }
         
         cardGraphics.setInteractive(new Phaser.Geom.Rectangle(0, 0, cardWidth, cardHeight), Phaser.Geom.Rectangle.Contains);
         cardGraphics.on('pointerdown', () => {
             console.log(`Clicked: ${card.toString()}`);
         });
         
-        return { 
+        const cardData = { 
             graphics: cardGraphics, 
             topRankText, 
-            topSuitText, 
-            bottomRankText, 
-            bottomSuitText, 
-            centerSuitText 
+            topSuitText
         };
+        
+        // Only add centerSuitText if it exists (not for joker cards with artwork)
+        if (centerSuitText) {
+            cardData.centerSuitText = centerSuitText;
+        }
+        
+        // Add artwork if it exists
+        if (cardArtwork) {
+            cardData.artwork = cardArtwork;
+        }
+        
+        return cardData;
     }
 
     getSuitSymbol(suit) {
@@ -176,6 +219,76 @@ export default class CardManager {
             case 'Spades': return theme.text.spades;
             default: return theme.text.spades;
         }
+    }
+    
+    createJokerBackground(graphics, cardWidth, cardHeight, cornerRadius) {
+        // Create a legendary gradient background for joker cards
+        const steps = 20;
+        const colors = [
+            0x1a1a2e, // Dark blue
+            0x16213e, // Darker blue
+            0x0f3460, // Deep blue
+            0x533483, // Purple
+            0x7b2cbf, // Violet
+            0x9d4edd, // Light purple
+        ];
+        
+        for (let i = 0; i < steps; i++) {
+            const progress = i / (steps - 1);
+            const colorIndex = Math.floor(progress * (colors.length - 1));
+            const colorProgress = (progress * (colors.length - 1)) - colorIndex;
+            
+            let color;
+            if (colorIndex >= colors.length - 1) {
+                color = colors[colors.length - 1];
+            } else {
+                // Interpolate between colors
+                const c1 = colors[colorIndex];
+                const c2 = colors[colorIndex + 1];
+                color = this.interpolateColor(c1, c2, colorProgress);
+            }
+            
+            const stripHeight = cardHeight / steps;
+            const y = i * stripHeight;
+            
+            graphics.fillStyle(color, 0.9);
+            if (i === 0) {
+                // First strip with rounded top corners
+                graphics.fillRoundedRect(0, y, cardWidth, stripHeight + 2, { tl: cornerRadius, tr: cornerRadius, bl: 0, br: 0 });
+            } else if (i === steps - 1) {
+                // Last strip with rounded bottom corners
+                graphics.fillRoundedRect(0, y - 2, cardWidth, stripHeight + 2, { tl: 0, tr: 0, bl: cornerRadius, br: cornerRadius });
+            } else {
+                // Middle strips
+                graphics.fillRect(0, y, cardWidth, stripHeight + 1);
+            }
+        }
+        
+        // Add golden sparkle overlay
+        for (let i = 0; i < 15; i++) {
+            const sparkleX = Math.random() * cardWidth;
+            const sparkleY = Math.random() * cardHeight;
+            const sparkleSize = 1 + Math.random() * 2;
+            
+            graphics.fillStyle(0xffd700, 0.6);
+            graphics.fillCircle(sparkleX, sparkleY, sparkleSize);
+        }
+    }
+    
+    interpolateColor(color1, color2, factor) {
+        const r1 = (color1 >> 16) & 0xff;
+        const g1 = (color1 >> 8) & 0xff;
+        const b1 = color1 & 0xff;
+        
+        const r2 = (color2 >> 16) & 0xff;
+        const g2 = (color2 >> 8) & 0xff;
+        const b2 = color2 & 0xff;
+        
+        const r = Math.round(r1 + (r2 - r1) * factor);
+        const g = Math.round(g1 + (g2 - g1) * factor);
+        const b = Math.round(b1 + (b2 - b1) * factor);
+        
+        return (r << 16) | (g << 8) | b;
     }
     
     createGradientBackground(graphics, width, height, cornerRadius, theme) {
