@@ -3,6 +3,7 @@ import Logger from '../logging/Logger.js';
 import { packManager } from '../packs/PackManager.js';
 import { ChainEffects } from '../effects/ChainEffects.js';
 import Card from '../game/Card.js';
+import { UIConfig } from '../config/UIConfig.js';
 
 export default class BattleManager {
     constructor(scene) {
@@ -443,6 +444,15 @@ export default class BattleManager {
             // Deal damage after animations complete
             targetEnemy.takeDamage(finalDamage, { isSpecialAttack: hasSpecialAttacks });
             
+            // Apply vampirism healing to all heroes
+            if (this.scene.heroManager) {
+                this.scene.heroManager.getAllHeroes().forEach(hero => {
+                    if (hero.isAlive()) {
+                        hero.applyVampirism(finalDamage);
+                    }
+                });
+            }
+            
             // Remove used cards from hand and clear selection
             this.removeSelectedCards();
         });
@@ -863,8 +873,13 @@ export default class BattleManager {
         
         // Show attack animation and damage
         this.showEnemyAttackEffect(enemy, targetHero, damage, () => {
-            // Apply damage to hero
-            targetHero.takeDamage(damage);
+            // Apply damage to hero (with equipment effects)
+            const actualDamage = targetHero.takeDamage(damage);
+            
+            // Check if hero died from damage
+            if (!targetHero.isAlive()) {
+                this.handleHeroDeath(targetHero);
+            }
             
             // Update hero display
             this.scene.updateHeroPortraits();
@@ -1084,6 +1099,23 @@ export default class BattleManager {
         
         // Calculate total gold earned this battle
         const totalGoldEarned = this.enemies.reduce((total, enemy) => total + enemy.goldReward, 0);
+        
+        // Check debug configuration for victory screen
+        if (!UIConfig.debug.showVictoryScreen) {
+            console.log('Victory screen disabled by debug config, proceeding directly to shop...');
+            // Award gold directly (as the normal victory screen does)
+            this.scene.inventory.addResource('gold', totalGoldEarned);
+            
+            // Proceed to shop scene after a brief delay (same as normal flow)
+            this.scene.time.delayedCall(500, () => {
+                this.scene.scene.start('ShopScene', {
+                    gold: this.scene.inventory.getResource('gold'),
+                    inventory: this.scene.inventory,
+                    heroManager: this.scene.heroManager
+                });
+            });
+            return;
+        }
         
         // Show CSS glassmorphism victory overlay
         const victoryOverlay = document.getElementById('victory-overlay');
@@ -1405,5 +1437,60 @@ export default class BattleManager {
         this.discardsRemaining += amount;
         this.maxDiscards += amount;
         this.scene.events.emit('discardsChanged', this.discardsRemaining, this.maxDiscards);
+    }
+    
+    // Handle hero death
+    handleHeroDeath(hero) {
+        console.log(`Hero ${hero.name} has died!`);
+        
+        // Show death effect
+        if (this.scene.events) {
+            this.scene.events.emit('heroDied', {
+                hero: hero,
+                timestamp: Date.now()
+            });
+        }
+        
+        // Check if all heroes are dead (game over condition)
+        if (this.scene.heroManager) {
+            const aliveHeroes = this.scene.heroManager.getAllHeroes().filter(h => h.isAlive());
+            if (aliveHeroes.length === 0) {
+                this.handleGameOver();
+            }
+        }
+    }
+    
+    // Handle game over
+    handleGameOver() {
+        console.log('Game Over - All heroes died!');
+        
+        // Show game over screen
+        this.scene.add.text(
+            this.scene.cameras.main.centerX,
+            this.scene.cameras.main.centerY,
+            'GAME OVER',
+            {
+                fontSize: '72px',
+                color: '#ff0000',
+                fontFamily: 'Arial'
+            }
+        ).setOrigin(0.5).setDepth(2000);
+        
+        // Restart button
+        const restartButton = this.scene.add.text(
+            this.scene.cameras.main.centerX,
+            this.scene.cameras.main.centerY + 100,
+            'Click to Restart',
+            {
+                fontSize: '32px',
+                color: '#ffffff',
+                fontFamily: 'Arial'
+            }
+        ).setOrigin(0.5).setDepth(2000);
+        
+        restartButton.setInteractive({ useHandCursor: true });
+        restartButton.on('pointerdown', () => {
+            this.scene.scene.restart();
+        });
     }
 }

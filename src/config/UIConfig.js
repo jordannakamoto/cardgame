@@ -65,6 +65,11 @@ export const UIConfig = {
         const width = (typeof window !== 'undefined' ? window.innerWidth : null) || 2560;
         const scale = Math.max(0.8, Math.min(2.0, width / 2560));
         return Math.max(minSize, Math.floor(baseSize * scale));
+    },
+    
+    // Debug configuration
+    debug: {
+        showVictoryScreen: false    // Set to false to disable victory screen
     }
 };
 
