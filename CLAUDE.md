@@ -199,6 +199,9 @@ src/
 │   └── Logger.js            # Toggleable logging system
 ├── managers/
 │   └── ModeManager.js       # Game mode management
+├── equipment/
+│   ├── Equipment.js         # Equipment class with stats and validation
+│   └── EquipmentRegistry.js # Equipment definitions and factory
 ├── packs/
 │   ├── Pack.js              # Pack class with card generation & rarity system
 │   └── PackManager.js       # Global pack management & shop integration
@@ -211,7 +214,8 @@ src/
 │   ├── ShopScene.js         # Shop with 3D pack physics and foil shaders
 │   └── PackOpeningScene.js  # Elegant pack opening with refined particle effects
 ├── ui/
-│   └── DebugMenu.js         # Debug mode switcher
+│   ├── DebugMenu.js         # Debug mode switcher
+│   └── EquipmentMenu.js     # Legacy equipment management modal
 └── index.js                 # Game initialization
 
 test/
@@ -248,6 +252,9 @@ All visual elements scaled 2x for 2560x1440:
 - **High Card Stacking**: Only highest card value counts for high card damage bonus
 - **Card Selection Limits**: Flexible 1-5 card selection instead of exactly 5
 - **Target Switching**: Damage preview properly transfers when switching enemies
+- **HitArea Callbacks**: Fixed null hitAreaCallback errors with proper rectangle hit areas
+- **Equipment Type Filtering**: Fixed undefined item types preventing inventory display
+- **Victory Screen Toggle**: Added debug configuration to disable victory screen animations
 
 ### Testing Commands
 ```bash
@@ -282,5 +289,28 @@ The game is a complete card battle system where players use poker hands to damag
 - **Refined Pack Opening**: Expedition 33-inspired elegant particle effects (dust motes, paper fragments)
 - **Sophisticated Card Generation**: Complete rarity system with meaningful gameplay bonuses
 - **Shop Integration**: Seamless flow from battle rewards to pack purchasing to card collection
+- **Drag-and-Drop Equipment**: Complete inventory grid with visual drag-and-drop equipment system
+- **Equipment Integration**: Full equipment slots with stats, effects, and hero integration
 
-All major systems are implemented, tested, and scaled for high-resolution display. The game is ready for expansion with additional heroes, enemies, items, and game modes.
+## Equipment System
+
+### Drag-and-Drop Interface
+- **Inventory Grid**: 4×3 visual grid in shop scene showing equipment items
+- **Hero Portraits**: Horizontal layout displaying actual hero portrait images
+- **Drag Mechanics**: Click and drag items from inventory grid to hero portraits
+- **Visual Feedback**: Green highlight on hero portraits during drag operations
+- **Smart Snapping**: Items snap back to grid if dropped in invalid areas
+
+### Equipment Classes & Stats
+- **Equipment Class**: Proper class instances with `canEquipTo()` validation
+- **Equipment Slots**: Armor and accessory slots per hero
+- **Stat System**: Damage reduction, vampirism, dodge chance, gold bonus
+- **Rarity Effects**: Equipment provides meaningful gameplay bonuses based on rarity
+
+### Shop Experience
+- **Inventory Persistence**: Items appear immediately after purchase
+- **Equipment Modal**: Legacy click-to-open equipment management still available
+- **Clean UI**: Grid slots show even when empty, providing clear inventory structure
+- **Success Feedback**: Animated "Equipped!" messages when items are successfully equipped
+
+All major systems are implemented, tested, and scaled for high-resolution display. The game now features a complete equipment system with intuitive drag-and-drop mechanics. Ready for expansion with additional heroes, enemies, items, and game modes.
