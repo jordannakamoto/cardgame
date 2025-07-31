@@ -169,6 +169,9 @@ export default class BattleScene extends Phaser.Scene {
         this.goldDisplay.setOrigin(0, 0.5);
         this.goldDisplay.setScrollFactor(0); // Keep fixed to camera
         
+        // Update gold display with current inventory amount
+        this.updateGoldDisplay();
+        
         // Hero display (removed - now shown in portraits)
         // this.heroDisplay = this.add.text(
         //     90,                     // 60 * 1.5

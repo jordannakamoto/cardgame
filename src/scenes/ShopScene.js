@@ -3,6 +3,9 @@ import Inventory from '../inventory/Inventory.js';
 import PartyManager from '../party/PartyManager.js';
 import { createHero, getAllHeroShopData } from '../heroes/HeroRegistry.js';
 import { packManager } from '../packs/PackManager.js';
+import { EquipmentRegistry } from '../equipment/EquipmentRegistry.js';
+import { Equipment } from '../equipment/Equipment.js';
+import { EquipmentMenu } from '../ui/EquipmentMenu.js';
 
 // Import the custom pipeline
 import FoilPipeline from '../rendering/FoilPipeline.js';
@@ -31,12 +34,31 @@ export default class ShopScene extends Phaser.Scene {
         this.playerGold = data.gold || 0;
         this.inventory = data.inventory || new Inventory();
         this.partyManager = data.partyManager || null;
+        this.heroManager = data.heroManager || null; // Get heroManager from battle
         this.playerDeck = data.playerDeck || null;
 
         // Create party manager if not provided
         if (!this.partyManager) {
             this.partyManager = new PartyManager(this);
         }
+        
+        // If no heroes exist anywhere, create a starter hero
+        const partyHeroes = this.partyManager.getAllHeroes();
+        const heroManagerHeroes = this.heroManager ? this.heroManager.getAllHeroes() : [];
+        
+        if (partyHeroes.length === 0 && heroManagerHeroes.length === 0) {
+            console.log('No heroes found, creating starter hero for shop');
+            const starterHero = createHero('starter_hero');
+            this.partyManager.purchaseHero(starterHero);
+        }
+        
+        // Use heroManager as fallback if no partyManager heroes
+        if (this.heroManager && (!this.partyManager || this.partyManager.getAllHeroes().length === 0)) {
+            console.log('Using heroManager for hero portraits');
+        }
+        
+        // Initialize equipment menu
+        this.equipmentMenu = new EquipmentMenu(this);
     }
 
     create() {
@@ -70,6 +92,14 @@ export default class ShopScene extends Phaser.Scene {
 
         // Create shop display
         this.createShopDisplay();
+        
+        // Create inventory grid
+        console.log('=== CALLING createInventoryGrid ===');
+        this.createInventoryGrid();
+        
+        // Hero portraits for equipment management
+        console.log('=== CALLING createHeroPortraits ===');
+        this.createHeroPortraits();
 
         // Continue button
         this.createContinueButton();
@@ -154,57 +184,26 @@ export default class ShopScene extends Phaser.Scene {
     }
 
     generateShopInventory() {
-        // Define all possible items
-        const allItems = [
+        // Get equipment from the new system
+        const allEquipment = EquipmentRegistry.getShopEquipment(4).map(equipment => ({
+            ...equipment.toJSON(),
+            category: 'equipment'
+        }));
+        
+        // Keep some consumables for variety
+        const consumables = [
             {
                 name: 'Health Potion',
                 description: 'Restore 50 health to active hero',
                 price: 8,
                 type: 'consumable',
+                category: 'consumable',
                 rarity: 'common',
                 effect: { type: 'heal', value: 50 }
-            },
-            {
-                name: 'Power Ring',
-                description: '+5 damage to all poker hands',
-                price: 15,
-                type: 'equipment',
-                rarity: 'uncommon',
-                effect: { type: 'damage_boost', value: 5 }
-            },
-            {
-                name: 'Lucky Charm',
-                description: 'Pairs deal +10 bonus damage',
-                price: 12,
-                type: 'equipment',
-                rarity: 'uncommon',
-                effect: { type: 'pair_bonus', value: 10 }
-            },
-            {
-                name: 'Arcane Crystal',
-                description: 'All heroes gain +1 ability activation',
-                price: 25,
-                type: 'equipment',
-                rarity: 'rare',
-                effect: { type: 'ability_boost', value: 1 }
-            },
-            {
-                name: 'Golden Deck',
-                description: 'Face cards deal +3 extra damage',
-                price: 18,
-                type: 'deck_modifier',
-                rarity: 'uncommon',
-                effect: { type: 'face_card_bonus', value: 3 }
-            },
-            {
-                name: 'Merchant\'s Blessing',
-                description: 'Gain +50% gold from battles',
-                price: 30,
-                type: 'equipment',
-                rarity: 'rare',
-                effect: { type: 'gold_multiplier', value: 1.5 }
             }
         ];
+        
+        const allItems = [...allEquipment, ...consumables];
 
         // Get available heroes
         const allHeroData = getAllHeroShopData();
@@ -601,19 +600,24 @@ export default class ShopScene extends Phaser.Scene {
         let iconSymbol = '?';
         let iconColor = '#ffffff';
 
-        switch(item.type) {
-            case 'consumable':
-                iconSymbol = '🧪';
-                iconColor = '#66ff88';
-                break;
-            case 'equipment':
-                iconSymbol = '💍';
-                iconColor = '#ffd700';
-                break;
-            case 'deck_modifier':
-                iconSymbol = '🃏';
-                iconColor = '#ff6666';
-                break;
+        if (item.category === 'equipment') {
+            // Use equipment's custom icon if available
+            iconSymbol = item.icon || (item.slot === 'armor' ? '🛡️' : '💍');
+            iconColor = '#ffd700';
+        } else {
+            switch(item.type) {
+                case 'consumable':
+                    iconSymbol = '🧪';
+                    iconColor = '#66ff88';
+                    break;
+                case 'deck_modifier':
+                    iconSymbol = '🃏';
+                    iconColor = '#ff6666';
+                    break;
+                default:
+                    iconSymbol = '❓';
+                    iconColor = '#cccccc';
+            }
         }
 
         const iconText = this.add.text(0, 0, iconSymbol, {
@@ -657,6 +661,7 @@ export default class ShopScene extends Phaser.Scene {
     }
 
     buyRegularItem(item, itemIndex) {
+        console.log('Buying item:', item);
         if (!item || typeof item.price !== 'number') {
             console.error('Invalid item data:', item);
             return;
@@ -667,14 +672,20 @@ export default class ShopScene extends Phaser.Scene {
         this.inventory.addResource('gold', -item.price);
         this.updateGoldDisplay();
 
-        // Add item to inventory
+        // Add item to inventory - force type to 'equipment' if undefined
+        const itemType = item.type || 'equipment';
         this.inventory.addItem({
-            id: `${item.type}_${Date.now()}`,
+            id: `${itemType}_${Date.now()}`,
             name: item.name,
             description: item.description,
-            type: item.type,
-            effect: item.effect
+            type: itemType,
+            effect: item.effect,
+            icon: item.icon || '⚙️',
+            rarity: item.rarity || 'common'
         });
+
+        // Refresh inventory display
+        this.refreshInventoryGrid();
 
         // Show purchase feedback
         this.showPurchaseEffect(item);
@@ -1090,5 +1101,518 @@ export default class ShopScene extends Phaser.Scene {
             inventory: this.inventory,
             partyManager: this.partyManager
         });
+    }
+    
+    // Create hero portraits for equipment management
+    createHeroPortraits() {
+        console.log('Creating hero portraits...');
+        console.log('Party manager:', this.partyManager);
+        console.log('Hero manager:', this.heroManager);
+        
+        let heroes = [];
+        
+        // Try partyManager first
+        if (this.partyManager) {
+            heroes = this.partyManager.getAllHeroes();
+            console.log('Heroes from partyManager:', heroes);
+        }
+        
+        // Fallback to heroManager if no heroes from partyManager
+        if ((!heroes || heroes.length === 0) && this.heroManager) {
+            console.log('Trying heroManager - type:', typeof this.heroManager.getAllHeroes);
+            heroes = this.heroManager.getAllHeroes();
+            console.log('Heroes from heroManager:', heroes);
+            console.log('HeroManager object:', this.heroManager);
+        }
+        
+        const screenWidth = this.cameras.main.width;
+        const screenHeight = this.cameras.main.height;
+        
+        if (!heroes || heroes.length === 0) {
+            console.log('No heroes to show from either manager!');
+            
+            // Create a test message where heroes should be
+            const noHeroesText = this.add.text(
+                screenWidth - 400,
+                screenHeight - 200,
+                'NO HEROES FOUND',
+                {
+                    fontSize: '32px',
+                    color: '#ff0000',
+                    fontFamily: 'Arial'
+                }
+            );
+            noHeroesText.setOrigin(0.5);
+            
+            return; // No heroes to show
+        }
+        
+        // Position in bottom right area, more visible
+        const heroSectionX = screenWidth - 400;
+        const heroSectionY = screenHeight - 200;
+        
+        // Title for hero section
+        const heroTitle = this.add.text(
+            heroSectionX,
+            heroSectionY - 120,
+            'Heroes - Equipment',
+            {
+                fontSize: '20px',
+                color: '#d4af37',
+                fontFamily: 'Arial'
+            }
+        );
+        heroTitle.setOrigin(0.5);
+        
+        // Create hero portraits in horizontal layout
+        const portraitSpacing = 130;
+        const startX = heroSectionX - (heroes.length * portraitSpacing) / 2 + portraitSpacing / 2;
+        
+        console.log('Starting to create hero portraits, heroes count:', heroes.length);
+        console.log('Hero section position:', heroSectionX, heroSectionY);
+        
+        // Initialize hero portraits tracking array
+        this.heroPortraits = [];
+        
+        heroes.forEach((hero, index) => {
+            console.log(`Creating portrait ${index} for hero:`, hero.name);
+            const portraitX = startX + (index * portraitSpacing);
+            const portraitY = heroSectionY;
+            
+            console.log(`Portrait position: x=${portraitX}, y=${portraitY}`);
+            
+            // Hero portrait container - bigger size
+            const portraitContainer = this.add.container(portraitX, portraitY);
+            
+            // Portrait background - bigger and more interactive
+            const portraitSize = 100;
+            const portraitBg = this.add.graphics();
+            portraitBg.fillStyle(0x444444, 0.9);
+            portraitBg.lineStyle(3, 0x8b4513, 1);
+            portraitBg.fillRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+            portraitBg.strokeRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+            portraitContainer.add(portraitBg);
+            
+            // Hero portrait image or fallback icon
+            if (hero.portraitKey) {
+                console.log('Using portrait image:', hero.portraitKey);
+                const heroPortrait = this.add.image(0, -5, hero.portraitKey);
+                heroPortrait.setDisplaySize(70, 70); // Fit within the portrait container
+                heroPortrait.setOrigin(0.5);
+                portraitContainer.add(heroPortrait);
+            } else {
+                console.log('No portrait key, using icon');
+                const heroIcon = this.add.text(0, -10, this.getHeroIcon(hero), {
+                    fontSize: '36px'
+                });
+                heroIcon.setOrigin(0.5);
+                portraitContainer.add(heroIcon);
+            }
+            
+            // Hero name - positioned better
+            const heroName = this.add.text(0, 25, hero.name, {
+                fontSize: '14px',
+                color: '#ffffff',
+                fontFamily: 'Arial'
+            });
+            heroName.setOrigin(0.5);
+            portraitContainer.add(heroName);
+            
+            // Health bar - smaller and positioned better
+            const healthBarWidth = 80;
+            const healthBarBg = this.add.graphics();
+            healthBarBg.fillStyle(0x333333, 0.8);
+            healthBarBg.fillRoundedRect(-healthBarWidth/2, 38, healthBarWidth, 8, 4);
+            portraitContainer.add(healthBarBg);
+            
+            const healthPercent = hero.currentHealth / hero.maxHealth;
+            const healthBar = this.add.graphics();
+            healthBar.fillStyle(healthPercent > 0.5 ? 0x4caf50 : healthPercent > 0.25 ? 0xff9800 : 0xf44336, 1);
+            healthBar.fillRoundedRect(-healthBarWidth/2, 38, healthBarWidth * healthPercent, 8, 4);
+            portraitContainer.add(healthBar);
+            
+            const healthText = this.add.text(0, 42, `${hero.currentHealth}/${hero.maxHealth}`, {
+                fontSize: '8px',
+                color: '#ffffff',
+                fontFamily: 'Arial'
+            });
+            healthText.setOrigin(0.5);
+            portraitContainer.add(healthText);
+            
+            // Equipment indicators - positioned at top corners
+            const armorIcon = this.add.text(-25, -35, hero.equipment.armor ? '🛡️' : '⬜', {
+                fontSize: '12px'
+            });
+            armorIcon.setOrigin(0.5);
+            portraitContainer.add(armorIcon);
+            
+            const accessoryIcon = this.add.text(25, -35, hero.equipment.accessory ? '💍' : '⬜', {
+                fontSize: '12px'
+            });
+            accessoryIcon.setOrigin(0.5);
+            portraitContainer.add(accessoryIcon);
+            
+            // Create a proper interactive button
+            const clickArea = this.add.rectangle(0, 0, portraitSize, portraitSize, 0x000000, 0);
+            clickArea.setInteractive({ useHandCursor: true });
+            portraitContainer.add(clickArea);
+            
+            clickArea.on('pointerdown', () => {
+                console.log('Hero portrait clicked:', hero.name);
+                this.openEquipmentMenu(hero);
+            });
+            clickArea.on('pointerover', () => {
+                portraitContainer.setScale(1.1);
+                // Create hover effect by changing the background
+                portraitBg.clear();
+                portraitBg.fillStyle(0x666666, 0.9);
+                portraitBg.lineStyle(3, 0xffd700, 1);
+                portraitBg.fillRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+                portraitBg.strokeRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+            });
+            clickArea.on('pointerout', () => {
+                portraitContainer.setScale(1.0);
+                // Restore original background
+                portraitBg.clear();
+                portraitBg.fillStyle(0x444444, 0.9);
+                portraitBg.lineStyle(3, 0x8b4513, 1);
+                portraitBg.fillRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+                portraitBg.strokeRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+            });
+            
+            // Add to tracking array for drag and drop
+            this.heroPortraits.push({
+                hero: hero,
+                container: portraitContainer,
+                background: portraitBg, // Store reference to background for tinting
+                x: portraitX,
+                y: portraitY
+            });
+        });
+    }
+    
+    // Get hero icon based on type
+    getHeroIcon(hero) {
+        console.log('Getting icon for hero:', hero.name, 'type:', hero.type);
+        switch (hero.type) {
+            case 'damage': return '⚔️';
+            case 'support': return '🛡️';
+            case 'hybrid': return '⚡';
+            default: 
+                console.log('Using default icon for hero type:', hero.type);
+                return '👤';
+        }
+    }
+    
+    // Create inventory grid for equipment management
+    createInventoryGrid() {
+        console.log('=== INSIDE createInventoryGrid ===');
+        console.log('Inventory object:', this.inventory);
+        console.log('Inventory getItems method:', typeof this.inventory?.getItems);
+        
+        const screenWidth = this.cameras.main.width;
+        const screenHeight = this.cameras.main.height;
+        
+        console.log('Screen dimensions:', screenWidth, 'x', screenHeight);
+        
+        // Position in the right side, above hero portraits
+        const inventoryX = screenWidth - 400;
+        const inventoryY = screenHeight - 500;
+        
+        console.log('Inventory position:', inventoryX, inventoryY);
+        
+        // Title for inventory section
+        const inventoryTitle = this.add.text(
+            inventoryX,
+            inventoryY - 50,
+            'Your Inventory',
+            {
+                fontSize: '32px',
+                color: '#d4af37',
+                fontFamily: 'Arial',
+                fontStyle: 'bold'
+            }
+        );
+        inventoryTitle.setOrigin(0.5);
+        inventoryTitle.setData('isInventoryTitle', true);
+        
+        // Get equipment items from inventory
+        let equipmentItems = [];
+        if (this.inventory && this.inventory.getItems) {
+            const allItems = this.inventory.getItems();
+            console.log('All inventory items:', allItems);
+            console.log('Item types:', allItems.map(item => `${item.name}: ${item.type}`));
+            equipmentItems = allItems.filter(item => item.type === 'equipment');
+            console.log('Equipment items after filter:', equipmentItems);
+        } else {
+            console.log('No inventory or getItems method!');
+        }
+        
+        // Grid settings - smaller, more compact
+        const itemsPerRow = 4;
+        const itemSize = 60;
+        const itemSpacing = 70;
+        const startX = inventoryX - (itemsPerRow * itemSpacing) / 2 + itemSpacing / 2;
+        const startY = inventoryY;
+        
+        // Create grid background slots (empty slots to show grid structure)
+        const maxRows = 3; // Show 3 rows worth of slots
+        for (let row = 0; row < maxRows; row++) {
+            for (let col = 0; col < itemsPerRow; col++) {
+                const x = startX + (col * itemSpacing);
+                const y = startY + (row * itemSpacing);
+                
+                // Create empty slot background
+                const slotBg = this.add.graphics();
+                slotBg.fillStyle(0x333333, 0.3); // Dark gray, semi-transparent
+                slotBg.lineStyle(1, 0x666666, 0.5); // Light gray border
+                slotBg.fillRoundedRect(-itemSize/2, -itemSize/2, itemSize, itemSize, 6);
+                slotBg.strokeRoundedRect(-itemSize/2, -itemSize/2, itemSize, itemSize, 6);
+                slotBg.x = x;
+                slotBg.y = y;
+                slotBg.setData('isInventoryTitle', true); // So it gets cleared on refresh
+            }
+        }
+        
+        // Create inventory items on top of grid
+        equipmentItems.forEach((item, index) => {
+            const row = Math.floor(index / itemsPerRow);
+            const col = index % itemsPerRow;
+            const x = startX + (col * itemSpacing);
+            const y = startY + (row * itemSpacing);
+            
+            this.createInventoryItem(item, x, y, itemSize);
+        });
+        
+        // No empty message needed - empty grid slots show the structure
+    }
+    
+    // Create a single inventory item with drag functionality
+    createInventoryItem(item, x, y, size) {
+        const itemContainer = this.add.container(x, y);
+        
+        // Item background with rarity color
+        const rarityColor = this.getRarityColor(item.rarity || 'common');
+        const itemBg = this.add.graphics();
+        itemBg.fillStyle(0x333333, 0.9);
+        itemBg.lineStyle(3, rarityColor, 1);
+        itemBg.fillRoundedRect(-size/2, -size/2, size, size, 8);
+        itemBg.strokeRoundedRect(-size/2, -size/2, size, size, 8);
+        itemContainer.add(itemBg);
+        
+        // Item icon
+        const icon = this.add.text(0, -8, item.icon || '⚙️', {
+            fontSize: '24px'
+        });
+        icon.setOrigin(0.5);
+        itemContainer.add(icon);
+        
+        // Item name (truncated)
+        const name = this.add.text(0, 20, item.name, {
+            fontSize: '12px',
+            color: '#ffffff',
+            fontFamily: 'Arial',
+            wordWrap: { width: size - 10 }
+        });
+        name.setOrigin(0.5);
+        itemContainer.add(name);
+        
+        // Make draggable
+        itemContainer.setInteractive(new Phaser.Geom.Rectangle(-size/2, -size/2, size, size), Phaser.Geom.Rectangle.Contains);
+        itemContainer.setData('item', item);
+        itemContainer.setData('isInventoryItem', true);
+        
+        // Drag functionality
+        this.input.setDraggable(itemContainer);
+        
+        itemContainer.on('dragstart', (pointer, dragX, dragY) => {
+            itemContainer.setScale(1.1);
+            itemContainer.setDepth(1000);
+        });
+        
+        itemContainer.on('drag', (pointer, dragX, dragY) => {
+            itemContainer.x = dragX;
+            itemContainer.y = dragY;
+            
+            // Check if over a hero portrait and highlight it
+            const dropTarget = this.getHeroPortraitAt(pointer.x, pointer.y);
+            
+            // Reset all hero portraits to normal
+            if (this.heroPortraits) {
+                this.heroPortraits.forEach(portraitData => {
+                    const bg = portraitData.background;
+                    const portraitSize = 100;
+                    bg.clear();
+                    bg.fillStyle(0x444444, 0.9);
+                    bg.lineStyle(3, 0x8b4513, 1);
+                    bg.fillRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+                    bg.strokeRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+                });
+            }
+            
+            // Highlight drop target with green glow
+            if (dropTarget) {
+                const bg = dropTarget.background;
+                const portraitSize = 100;
+                bg.clear();
+                bg.fillStyle(0x444444, 0.9);
+                bg.lineStyle(4, 0x00ff88, 1); // Green border
+                bg.fillRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+                bg.strokeRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+            }
+        });
+        
+        itemContainer.on('dragend', (pointer) => {
+            itemContainer.setScale(1.0);
+            itemContainer.setDepth(0);
+            
+            // Reset all hero portraits to normal
+            if (this.heroPortraits) {
+                this.heroPortraits.forEach(portraitData => {
+                    const bg = portraitData.background;
+                    const portraitSize = 100;
+                    bg.clear();
+                    bg.fillStyle(0x444444, 0.9);
+                    bg.lineStyle(3, 0x8b4513, 1);
+                    bg.fillRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+                    bg.strokeRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+                });
+            }
+            
+            // Check if dropped on a hero portrait
+            const dropTarget = this.getHeroPortraitAt(pointer.x, pointer.y);
+            if (dropTarget) {
+                this.equipItemToHero(item, dropTarget);
+                itemContainer.destroy();
+                this.refreshInventoryGrid();
+            } else {
+                // Snap back to original position
+                itemContainer.x = x;
+                itemContainer.y = y;
+            }
+        });
+        
+        // Hover effects
+        itemContainer.on('pointerover', () => {
+            if (!itemContainer.input.isDragging) {
+                itemContainer.setScale(1.05);
+            }
+        });
+        
+        itemContainer.on('pointerout', () => {
+            if (!itemContainer.input.isDragging) {
+                itemContainer.setScale(1.0);
+            }
+        });
+    }
+    
+    // Get rarity color for items
+    getRarityColor(rarity) {
+        switch (rarity) {
+            case 'common': return 0x9e9e9e;
+            case 'uncommon': return 0x4caf50;
+            case 'rare': return 0x2196f3;
+            case 'legendary': return 0xff9800;
+            default: return 0x9e9e9e;
+        }
+    }
+    
+    // Check if pointer is over a hero portrait
+    getHeroPortraitAt(x, y) {
+        if (!this.heroPortraits) return null;
+        
+        for (let portraitData of this.heroPortraits) {
+            const portrait = portraitData.container;
+            const bounds = portrait.getBounds();
+            
+            if (x >= bounds.x && x <= bounds.x + bounds.width &&
+                y >= bounds.y && y <= bounds.y + bounds.height) {
+                return portraitData;
+            }
+        }
+        return null;
+    }
+    
+    // Equip an item to a hero
+    equipItemToHero(item, dropTarget) {
+        const hero = dropTarget.hero;
+        console.log(`Equipping ${item.name} to ${hero.name}`);
+        console.log('Item data:', item);
+        console.log('Hero equipment before:', hero.equipment);
+        
+        // Create Equipment class instance from inventory item
+        const equipment = new Equipment({
+            id: item.id,
+            name: item.name,
+            description: item.description,
+            slot: 'accessory', // Default to accessory slot for now
+            rarity: item.rarity || 'common',
+            icon: item.icon || '⚙️',
+            passiveStats: {
+                // Add some basic stats based on item name/description
+                damageReduction: item.name.includes('Shield') ? 5 : 0,
+                vampirism: item.name.includes('Healing') || item.name.includes('Regeneration') ? 0.1 : 0,
+                goldBonus: item.name.includes('Trickster') ? 0.2 : 0
+            }
+        });
+        
+        // Equip to hero (assuming hero has an equipItem method)
+        if (hero.equipItem) {
+            const success = hero.equipItem(equipment);
+            console.log('Equipment success:', success);
+        } else {
+            // Fallback: directly assign to equipment slot
+            if (!hero.equipment) hero.equipment = {};
+            hero.equipment[equipment.slot] = equipment;
+            console.log('Directly equipped to hero.equipment');
+        }
+        
+        console.log('Hero equipment after:', hero.equipment);
+        
+        // Remove item from inventory
+        this.inventory.removeItem(item.id);
+        
+        // Show success message
+        const successText = this.add.text(
+            dropTarget.x,
+            dropTarget.y - 50,
+            `Equipped!`,
+            {
+                fontSize: '18px',
+                color: '#00ff00',
+                fontFamily: 'Arial'
+            }
+        );
+        successText.setOrigin(0.5);
+        
+        // Fade out success message
+        this.tweens.add({
+            targets: successText,
+            alpha: 0,
+            y: successText.y - 30,
+            duration: 1500,
+            ease: 'Power2',
+            onComplete: () => successText.destroy()
+        });
+    }
+    
+    // Refresh the inventory grid after changes
+    refreshInventoryGrid() {
+        console.log('=== REFRESHING INVENTORY GRID ===');
+        
+        // Clear existing inventory items and title
+        const inventoryItems = this.children.list.filter(child => 
+            child.getData && (child.getData('isInventoryItem') || child.getData('isInventoryTitle'))
+        );
+        console.log('Clearing', inventoryItems.length, 'inventory items');
+        inventoryItems.forEach(item => item.destroy());
+        
+        // Recreate the grid
+        this.createInventoryGrid();
+    }
+    
+    // Open equipment menu for a hero (legacy - will be removed)
+    openEquipmentMenu(hero) {
+        this.equipmentMenu.open(hero, this.inventory);
     }
 }

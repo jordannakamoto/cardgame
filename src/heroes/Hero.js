@@ -27,6 +27,29 @@ export default class Hero {
         
         // Special animations for hero abilities
         this.specialAnimations = new Map();
+        
+        // Equipment system
+        this.equipment = {
+            armor: null,
+            accessory: null
+        };
+        
+        // Equipment-modified stats
+        this.stats = {
+            damageReduction: 0,
+            dodgeChance: 0,
+            vampirism: 0,
+            goldBonus: 0
+        };
+        
+        // Temporary stats (for one-time effects)
+        this.tempStats = {};
+        
+        // Equipment handlers for event cleanup
+        this.equipmentHandlers = new Map();
+        
+        // Equipment properties (for special effects)
+        this.equipmentProperties = {};
     }
     
     // Initialize hero with event system
@@ -199,13 +222,41 @@ export default class Hero {
         return false;
     }
     
-    // Take damage
+    // Take damage (with equipment effects)
     takeDamage(amount) {
         const previousHealth = this.currentHealth;
-        this.currentHealth = Math.max(0, this.currentHealth - amount);
+        let actualDamage = amount;
+        
+        // Check for temporary damage block
+        if (this.tempStats.nextDamageBlocked) {
+            this.tempStats.nextDamageBlocked = false;
+            actualDamage = 0;
+            
+            // Show block effect
+            this.publishMove('damageBlocked', {
+                originalAmount: amount,
+                hero: this
+            });
+        } else {
+            // Apply dodge chance
+            if (this.stats.dodgeChance > 0 && Math.random() < this.stats.dodgeChance) {
+                actualDamage = 0;
+                
+                this.publishMove('damageDodged', {
+                    originalAmount: amount,
+                    hero: this
+                });
+            } else {
+                // Apply damage reduction
+                actualDamage = Math.max(1, amount - this.stats.damageReduction);
+            }
+        }
+        
+        this.currentHealth = Math.max(0, this.currentHealth - actualDamage);
         
         this.publishMove('damageTaken', {
-            amount,
+            amount: actualDamage,
+            originalAmount: amount,
             previousHealth,
             currentHealth: this.currentHealth,
             isDead: this.currentHealth <= 0
@@ -231,8 +282,84 @@ export default class Hero {
         return this.currentHealth > 0;
     }
     
+    // Equipment management
+    equipItem(equipment) {
+        const slot = equipment.slot;
+        
+        if (!this.equipment.hasOwnProperty(slot)) {
+            console.error(`Invalid equipment slot: ${slot}`);
+            return false;
+        }
+        
+        if (!equipment.canEquipTo(this)) {
+            console.error(`Cannot equip ${equipment.name} to ${this.name}`);
+            return false;
+        }
+        
+        // Unequip existing item in slot
+        if (this.equipment[slot]) {
+            this.unequipItem(slot);
+        }
+        
+        // Equip new item
+        this.equipment[slot] = equipment;
+        equipment.onEquip(this);
+        
+        this.publishMove('itemEquipped', {
+            equipment: equipment,
+            slot: slot
+        });
+        
+        return true;
+    }
+    
+    unequipItem(slot) {
+        const equipment = this.equipment[slot];
+        if (!equipment) return null;
+        
+        equipment.onUnequip(this);
+        this.equipment[slot] = null;
+        
+        this.publishMove('itemUnequipped', {
+            equipment: equipment,
+            slot: slot
+        });
+        
+        return equipment;
+    }
+    
+    getEquippedItems() {
+        return Object.values(this.equipment).filter(item => item !== null);
+    }
+    
+    hasEquippedItem(slot) {
+        return this.equipment[slot] !== null;
+    }
+    
+    // Apply vampirism healing after dealing damage
+    applyVampirism(damageDealt) {
+        if (this.stats.vampirism > 0) {
+            const healAmount = Math.floor(damageDealt * this.stats.vampirism);
+            if (healAmount > 0) {
+                this.heal(healAmount);
+                
+                this.publishMove('vampirismHealing', {
+                    damageDealt: damageDealt,
+                    healAmount: healAmount
+                });
+            }
+        }
+    }
+    
     // Cleanup when hero is removed
     cleanup() {
+        // Unequip all items
+        Object.keys(this.equipment).forEach(slot => {
+            if (this.equipment[slot]) {
+                this.unequipItem(slot);
+            }
+        });
+        
         if (this.eventBus) {
             console.log(`Hero ${this.name} cleaning up ${this.eventSubscriptions.length} event subscriptions`);
             console.log('Subscriptions to clean:', this.eventSubscriptions.map(s => s.eventName));
@@ -253,17 +380,29 @@ export default class Hero {
         return {
             id: this.id,
             currentMana: this.currentMana,
+            currentHealth: this.currentHealth,
             level: this.level,
             experience: this.experience,
-            state: this.state
+            state: this.state,
+            equipment: {
+                armor: this.equipment.armor?.toJSON() || null,
+                accessory: this.equipment.accessory?.toJSON() || null
+            }
         };
     }
     
     load(data) {
         this.currentMana = data.currentMana || 0;
+        this.currentHealth = data.currentHealth || this.maxHealth;
         this.level = data.level || 1;
         this.experience = data.experience || 0;
         this.state = data.state || {};
+        
+        // Load equipment (will need Equipment registry to recreate)
+        if (data.equipment) {
+            // Equipment loading will be handled by the system that calls this
+            // since it needs access to the Equipment registry
+        }
     }
 }
 

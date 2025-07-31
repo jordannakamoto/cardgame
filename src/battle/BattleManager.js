@@ -1186,6 +1186,7 @@ export default class BattleManager {
                 gold: this.scene.inventory.getResource('gold'),
                 inventory: this.scene.inventory,
                 partyManager: this.scene.partyManager,
+                heroManager: this.scene.heroManager,
                 playerDeck: this.scene.playerDeck
             });
         };
