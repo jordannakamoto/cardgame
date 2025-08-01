@@ -1,3 +1,5 @@
+import { UIConfig } from '../config/UIConfig.js';
+
 export default class ManaSystem {
     constructor(scene) {
         this.scene = scene;
@@ -23,15 +25,25 @@ export default class ManaSystem {
     }
     
     createUI() {
-        // Position above the hand preview panel, moved right slightly
+        // Get panel configuration
+        const screenWidth = this.scene.cameras.main.width;
         const screenHeight = this.scene.cameras.main.height;
-        this.manaContainer = this.scene.add.container(150, screenHeight - 200);
+        const manaConfig = UIConfig.panels.mana;
+        const isRightSide = UIConfig.panels.position === 'right';
+        
+        // Calculate X position based on side preference
+        const xPos = isRightSide ? 
+            screenWidth - manaConfig.offsetX : 
+            manaConfig.offsetX;
+        const yPos = screenHeight - manaConfig.offsetY;
+        
+        this.manaContainer = this.scene.add.container(xPos, yPos);
         this.manaContainer.setDepth(1000); // High depth to stay on top
         this.manaContainer.setScrollFactor(0); // Keep fixed to camera
         
-        // Background panel for mana display - much bigger
-        const panelWidth = 400;
-        const panelHeight = 120;
+        // Background panel for mana display
+        const panelWidth = manaConfig.width;
+        const panelHeight = manaConfig.height;
         const panelBg = this.scene.add.rectangle(0, 0, panelWidth, panelHeight, 0x000000, 0.6);
         panelBg.setStrokeStyle(2, 0x444444);
         this.manaContainer.add(panelBg);

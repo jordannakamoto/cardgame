@@ -70,6 +70,22 @@ export const UIConfig = {
     // Debug configuration
     debug: {
         showVictoryScreen: false    // Set to false to disable victory screen
+    },
+    
+    // UI Panel positioning
+    panels: {
+        position: 'left',  // 'left' or 'right' - side of screen for ability and mana panels
+        ability: {
+            offsetX: 160,  // Distance from edge of screen (increased for wider buttons)
+            width: 280,    // Wider to match button width
+            height: 400
+        },
+        mana: {
+            offsetX: 150,  // Distance from edge of screen  
+            offsetY: 200,  // Distance from bottom
+            width: 400,
+            height: 120
+        }
     }
 };
 

@@ -1,3 +1,5 @@
+import { UIConfig } from '../config/UIConfig.js';
+
 export default class AbilityPanel {
     constructor(scene, heroManager, manaSystem) {
         this.scene = scene;
@@ -15,28 +17,23 @@ export default class AbilityPanel {
     }
     
     createUI() {
-        // Create panel container on left side
+        // Get panel configuration
+        const screenWidth = this.scene.cameras.main.width;
         const screenHeight = this.scene.cameras.main.height;
-        this.panelContainer = this.scene.add.container(120, screenHeight / 2);
+        const panelConfig = UIConfig.panels.ability;
+        const isRightSide = UIConfig.panels.position === 'right';
+        
+        // Calculate X position based on side preference
+        const xPos = isRightSide ? 
+            screenWidth - panelConfig.offsetX : 
+            panelConfig.offsetX;
+        
+        this.panelContainer = this.scene.add.container(xPos, screenHeight / 2);
         this.panelContainer.setDepth(1000);
         this.panelContainer.setScrollFactor(0);
         
-        // Background panel
-        const panelWidth = 200;
-        const panelHeight = 400;
-        const panelBg = this.scene.add.rectangle(0, 0, panelWidth, panelHeight, 0x000000, 0.7);
-        panelBg.setStrokeStyle(2, 0x444444);
-        this.panelContainer.add(panelBg);
-        
-        // Title
-        const titleText = this.scene.add.text(0, -180, 'ABILITIES', {
-            fontSize: '24px',
-            color: '#ffffff',
-            fontFamily: 'Arial',
-            fontWeight: 'bold'
-        });
-        titleText.setOrigin(0.5);
-        this.panelContainer.add(titleText);
+        // No background panel - abilities will be visible on their own
+        // No title - cleaner look
         
         this.updateAbilityDisplay();
     }
@@ -74,7 +71,7 @@ export default class AbilityPanel {
         
         // Create buttons for each ability
         allAbilities.forEach((abilityData, index) => {
-            const yPos = -120 + (index * 80);
+            const yPos = -150 + (index * 100); // More spacing without title
             this.createAbilityButton(abilityData.hero, abilityData.ability, 0, yPos);
         });
     }
@@ -83,18 +80,18 @@ export default class AbilityPanel {
         const buttonContainer = this.scene.add.container(x, y);
         this.panelContainer.add(buttonContainer);
         
-        // Button background
-        const buttonBg = this.scene.add.rectangle(0, 0, 180, 60, 0x333333);
-        buttonBg.setStrokeStyle(2, 0x666666);
+        // Button background - wider and taller
+        const buttonBg = this.scene.add.rectangle(0, 0, 280, 80, 0x333333);
+        buttonBg.setStrokeStyle(3, 0x666666);
         buttonContainer.add(buttonBg);
         
-        // Ability icon
-        const icon = ability.createIcon(this.scene, -60, 0);
+        // Ability icon - positioned more to the left
+        const icon = ability.createIcon(this.scene, -100, 0);
         buttonContainer.add(icon);
         
-        // Ability name
-        const nameText = this.scene.add.text(-20, -10, ability.name, {
-            fontSize: '16px',
+        // Ability name - bigger text
+        const nameText = this.scene.add.text(-50, -15, ability.name, {
+            fontSize: '22px',
             color: '#ffffff',
             fontFamily: 'Arial',
             fontWeight: 'bold'
@@ -102,9 +99,9 @@ export default class AbilityPanel {
         nameText.setOrigin(0, 0.5);
         buttonContainer.add(nameText);
         
-        // Mana cost
-        const costText = this.scene.add.text(-20, 8, ability.getManaCostString(), {
-            fontSize: '14px',
+        // Mana cost - bigger text
+        const costText = this.scene.add.text(-50, 12, ability.getManaCostString(), {
+            fontSize: '18px',
             color: '#aaaaaa',
             fontFamily: 'Arial'
         });
