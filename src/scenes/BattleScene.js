@@ -15,6 +15,7 @@ import { cardTraitRegistry } from '../game/CardTraitRegistry.js';
 import { PerspectiveConfig } from '../config/PerspectiveConfig.js';
 import ManaSystem from '../battle/ManaSystem.js';
 import AbilityManager from '../battle/AbilityManager.js';
+import HandPreviewPanel from '../ui/HandPreviewPanel.js';
 
 export default class BattleScene extends Phaser.Scene {
     constructor() {
@@ -162,8 +163,11 @@ export default class BattleScene extends Phaser.Scene {
         this.heroPortraitsContainer = this.add.container(screenWidth / 2, screenHeight - 480);  // Portraits back above cards
         this.heroPortraitsContainer.setScrollFactor(0); // Keep hero portraits fixed to camera
 
-        // Create damage calculation panel
-        this.createDamagePanel();
+        // Create hand preview panel
+        this.handPreviewPanel = new HandPreviewPanel(this);
+        
+        // Set Persona 5 theme for testing
+        this.handPreviewPanel.setTheme('persona5');
 
         // Gold display with symbol
         this.goldDisplay = this.add.text(
@@ -251,55 +255,6 @@ export default class BattleScene extends Phaser.Scene {
         this.createHeroPortraits();
     }
 
-    createDamagePanel() {
-        const screenWidth = this.cameras.main.width;
-        const screenHeight = this.cameras.main.height;
-
-        // Get panel configuration
-        const handConfig = UIConfig.panels.handPreview;
-        const isRightSide = handConfig.position === 'right';
-        
-        // Calculate X position based on side preference
-        const xPos = isRightSide ? 
-            screenWidth - handConfig.offsetX : 
-            handConfig.offsetX;
-        const yPos = screenHeight - handConfig.offsetY;
-
-        // Create panel container
-        this.damagePanelContainer = this.add.container(xPos, yPos);
-        this.damagePanelContainer.setScrollFactor(0); // Keep fixed to camera
-
-        // Panel background
-        const panelWidth = handConfig.width;
-        const panelHeight = handConfig.height;
-        const panelBg = this.add.graphics();
-        panelBg.fillStyle(0x2a2a2a, 0.9);
-        panelBg.fillRoundedRect(0, 0, panelWidth, panelHeight, 12);
-        panelBg.lineStyle(3, 0x555555, 0.8);
-        panelBg.strokeRoundedRect(0, 0, panelWidth, panelHeight, 12);
-
-        // Inner glow
-        panelBg.lineStyle(1, 0x888888, 0.4);
-        panelBg.strokeRoundedRect(4, 4, panelWidth - 8, panelHeight - 8, 8);
-
-        // Damage preview text
-        this.handPreview = this.add.text(
-            panelWidth / 2,
-            panelHeight / 2,
-            '',
-            {
-                fontSize: '36px',   // Smaller to fit in panel
-                color: '#ffffff',
-                fontFamily: 'Arial',
-                fontStyle: 'bold',
-                align: 'center'
-            }
-        );
-        this.handPreview.setOrigin(0.5);
-
-        // Add elements to container
-        this.damagePanelContainer.add([panelBg, this.handPreview]);
-    }
 
     createEnemies() {
         // Create enemies using the new type system
@@ -443,7 +398,7 @@ Hover over cards for preview`;
     updateHandDisplay(cards, selectedCards = [], forceAnimation = false, newCards = []) {
         if (!cards || cards.length === 0) {
             this.handCardsContainer.removeAll(true);
-            this.handPreview.setText('');
+            this.handPreviewPanel.updateText('');
             return;
         }
 
@@ -838,7 +793,7 @@ Hover over cards for preview`;
 
     updateHandPreview(cards, selectedCards) {
         if (selectedCards.length === 0) {
-            this.handPreview.setText('');
+            this.handPreviewPanel.updateText('');
             // Clear damage preview when no cards selected
             this.clearAllDamagePreview();
             // Clear hero activation indicator
@@ -861,7 +816,7 @@ Hover over cards for preview`;
 
                 // Only calculate damage if target is alive
                 if (!currentTarget || !currentTarget.isAlive || currentTarget.currentHealth <= 0) {
-                    this.handPreview.setText('');
+                    this.handPreviewPanel.updateText('');
                     this.clearAllDamagePreview();
                     this.updateHeroActivationIndicator([]);
                     return;
@@ -952,7 +907,7 @@ Hover over cards for preview`;
                     }
                 }
 
-                this.handPreview.setText(previewText);
+                this.handPreviewPanel.updateText(previewText);
 
                 // Indicate hero ability activation in portrait
                 this.updateHeroActivationIndicator(activatedHeroes);
@@ -961,7 +916,7 @@ Hover over cards for preview`;
                 this.updateTargetDamageIndicator(finalDamage);
             });
         } catch (error) {
-            this.handPreview.setText('Invalid hand selection');
+            this.handPreviewPanel.updateText('Invalid hand selection');
         }
     }
 
