@@ -255,7 +255,7 @@ export default class BattleManager {
         const selectedCards = this.getSelectedCards();
         
         // Check if any selected card has chain trait
-        const chainCard = selectedCards.find(card => card.hasChain());
+        const chainCard = selectedCards.find(card => card && card.hasChain && card.hasChain());
         
         if (chainCard) {
             // Handle chain attack

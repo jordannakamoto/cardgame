@@ -1409,18 +1409,12 @@ Hover over cards for preview`;
 
     // Perspective skew effect - distort background based on viewing angle
     updateBackdropParallax(enemyIndex) {
-        console.log('updateBackdropParallax called with enemyIndex:', enemyIndex);
-        
         if (!this.backdrop || !this.battleManager.enemies || this.battleManager.enemies.length === 0) {
-            console.log('Parallax aborted: missing backdrop or enemies');
             return;
         }
 
         const targetEnemy = this.battleManager.enemies[enemyIndex];
-        if (!targetEnemy) {
-            console.log('Parallax aborted: no target enemy at index', enemyIndex);
-            return;
-        }
+        if (!targetEnemy) return;
 
         const screenWidth = this.cameras.main.width;
         const screenCenter = screenWidth / 2;
@@ -1443,13 +1437,6 @@ Hover over cards for preview`;
         const enemyShift = viewingAngle * (perspectiveRange * PerspectiveConfig.enemies.shiftMultiplier);
         const perspectiveRotation = viewingAngle * PerspectiveConfig.backdrop.rotationMultiplier;
         
-        console.log('Parallax calculations:', {
-            viewingAngle,
-            backgroundShift,
-            enemyShift,
-            perspectiveRotation,
-            targetEnemyX: targetEnemy.x
-        });
         
         // Animate backdrop
         this.tweens.add({
