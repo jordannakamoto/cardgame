@@ -1,5 +1,6 @@
 import Card from './Card.js';
 import { getCurrentTheme } from '../config/CardThemes.js';
+import { CardDecorations } from '../rendering/CardDecorations.js';
 
 export default class CardManager {
     constructor(scene) {
@@ -63,10 +64,8 @@ export default class CardManager {
             cardGraphics.strokeRoundedRect(-2, -2, cardWidth + 4, cardHeight + 4, cornerRadius + 2);
         }
         
-        // Add decorative elements for magic theme
-        if (theme.decorations) {
-            this.addMagicDecorations(cardGraphics, cardWidth, cardHeight, theme);
-        }
+        // Add decorative elements using configurable system
+        CardDecorations.addDecorations(cardGraphics, cardWidth, cardHeight);
         
         // Special artwork for joker cards
         let cardArtwork = null;
@@ -279,45 +278,4 @@ export default class CardManager {
         graphics.fillRoundedRect(width * 0.2, height * 0.2, width * 0.6, height * 0.6, cornerRadius - 4);
     }
     
-    addMagicDecorations(graphics, width, height, theme) {
-        const ornamentColor = theme.ornaments.colorOverride;
-        
-        if (theme.ornaments.corners) {
-            // Add corner ornaments
-            const ornamentSize = width * 0.08;
-            graphics.lineStyle(2, ornamentColor, 0.7);
-            
-            // Top-left corner ornament
-            graphics.beginPath();
-            graphics.arc(ornamentSize * 1.5, ornamentSize * 1.5, ornamentSize, Math.PI, Math.PI * 1.5);
-            graphics.strokePath();
-            
-            // Top-right corner ornament
-            graphics.beginPath();
-            graphics.arc(width - ornamentSize * 1.5, ornamentSize * 1.5, ornamentSize, Math.PI * 1.5, Math.PI * 2);
-            graphics.strokePath();
-            
-            // Bottom-left corner ornament
-            graphics.beginPath();
-            graphics.arc(ornamentSize * 1.5, height - ornamentSize * 1.5, ornamentSize, Math.PI * 0.5, Math.PI);
-            graphics.strokePath();
-            
-            // Bottom-right corner ornament
-            graphics.beginPath();
-            graphics.arc(width - ornamentSize * 1.5, height - ornamentSize * 1.5, ornamentSize, 0, Math.PI * 0.5);
-            graphics.strokePath();
-        }
-        
-        if (theme.ornaments.center) {
-            // Add center border decoration
-            graphics.lineStyle(1, ornamentColor, 0.4);
-            const centerX = width * 0.5;
-            const centerY = height * 0.5;
-            const decorRadius = Math.min(width, height) * 0.25;
-            
-            // Central mystical circle
-            graphics.strokeCircle(centerX, centerY, decorRadius);
-            graphics.strokeCircle(centerX, centerY, decorRadius * 0.7);
-        }
-    }
 }

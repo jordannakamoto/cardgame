@@ -9,14 +9,14 @@ export const PerspectiveConfig = {
         animationDuration: 1000,       // Slightly faster response
         animationEasing: 'Sine.easeInOut'
     },
-    
+
     // Enemy perspective effects
     enemies: {
         shiftMultiplier: 15,           // More enemy movement (9.6 → 15)
         animationDuration: 1000,       // Match backdrop timing
         animationEasing: 'Sine.easeInOut'
     },
-    
+
     // Enemy breathing/idle animations
     breathing: {
         scaleAmount: 0.04,             // More noticeable breathing (4% scale change)
@@ -28,7 +28,7 @@ export const PerspectiveConfig = {
             max: 200                   // Much shorter delay so breathing starts quickly
         }
     },
-    
+
     // Camera/viewport effects
     camera: {
         targetingZoom: 1.024,          // Subtle zoom when targeting (increased by 0.2 factor from 1.02)
