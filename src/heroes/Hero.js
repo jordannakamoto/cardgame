@@ -262,6 +262,17 @@ export default class Hero {
             isDead: this.currentHealth <= 0
         });
         
+        // Also emit a direct damage event for UI updates
+        if (this.eventBus) {
+            this.eventBus.emit('heroDamageTaken', this.id, {
+                amount: actualDamage,
+                originalAmount: amount,
+                previousHealth,
+                currentHealth: this.currentHealth,
+                isDead: this.currentHealth <= 0
+            });
+        }
+        
         return this.currentHealth <= 0; // Return true if hero died
     }
     

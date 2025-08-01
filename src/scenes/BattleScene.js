@@ -287,13 +287,21 @@ export default class BattleScene extends Phaser.Scene {
         this.events.on('manaChanged', this.updateManaDisplay, this);
 
         // Listen for hero changes
-        this.events.on('activeHeroChanged', this.updateHeroPortraits, this);
+        this.events.on('activeHeroChanged', (hero) => {
+            console.log('activeHeroChanged event triggered for:', hero?.name);
+            this.updateHeroPortraits();
+        });
 
         // Listen for sort mode changes
         this.events.on('sortModeChanged', this.updateSortButtonText, this);
 
         // Listen for discard changes
         this.events.on('discardsChanged', this.updateDiscardCounter, this);
+
+        // Listen for hero damage events
+        this.events.on('heroDamageTaken', (heroId, damageData) => {
+            this.updateHeroHealthBar(heroId, damageData);
+        });
 
         // Info menu toggle with 'I' key
         this.input.keyboard.on('keydown-I', () => {
@@ -1079,6 +1087,45 @@ Hover over cards for preview`;
                 this.discardCounter.setStyle({ color: '#888888' }); // Gray when used up
             }
         }
+    }
+
+    updateHeroHealthBar(heroId, damageData) {
+        // Find the hero in the party
+        const heroes = this.heroManager.getAllHeroes();
+        const heroIndex = heroes.findIndex(hero => hero.id === heroId);
+        
+        if (heroIndex === -1) return;
+        
+        const hero = heroes[heroIndex];
+        const portraitContainers = this.heroPortraitsContainer.list;
+        
+        if (heroIndex >= portraitContainers.length) return;
+        
+        const portraitContainer = portraitContainers[heroIndex];
+        const portraitElements = portraitContainer.list;
+        const hpBar = portraitElements[3]; // HP bar is at index 3
+        const hpText = portraitElements[4]; // HP text is at index 4
+        
+        if (!hpBar || !hpText || typeof hpText.setText !== 'function') return;
+        
+        // Calculate new health bar dimensions
+        const portraitWidth = UIConfig.hero.portraitWidth;
+        const hpPercent = hero.currentHealth / hero.maxHealth;
+        const newHpBarWidth = (portraitWidth - 10) * hpPercent;
+        
+        // Kill any existing health bar tweens
+        this.tweens.killTweensOf(hpBar);
+        
+        // Update HP text immediately
+        hpText.setText(`${hero.currentHealth}/${hero.maxHealth}`);
+        
+        // Simple width-only animation (no position changes)
+        this.tweens.add({
+            targets: hpBar,
+            width: newHpBarWidth,
+            duration: 150,
+            ease: 'Elastic.easeOut'
+        });
     }
 
 

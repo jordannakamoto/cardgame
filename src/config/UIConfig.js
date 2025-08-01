@@ -43,7 +43,8 @@ export const UIConfig = {
     enemy: {
         width: 240,              // 160 * 1.5
         height: 300,             // 200 * 1.5
-        spacing: 270             // 180 * 1.5
+        spacing: 270,            // 180 * 1.5
+        showDamagePreview: false // Hide damage preview overlay on enemy health bars
     },
     
     // Responsive breakpoints

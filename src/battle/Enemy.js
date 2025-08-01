@@ -1,4 +1,5 @@
 import { PerspectiveConfig } from '../config/PerspectiveConfig.js';
+import { UIConfig } from '../config/UIConfig.js';
 
 export default class Enemy {
     constructor(scene, x, y, config) {
@@ -221,9 +222,20 @@ export default class Enemy {
         const healthPercent = this.currentHealth / this.maxHealth;
         const newWidth = 240 * healthPercent;  // 160 * 1.5
 
-        // Update width but keep position fixed at center
-        this.healthBar.width = newWidth;
-        this.healthBar.x = this.x; // Keep centered on enemy
+        // Kill any existing health bar tweens
+        this.scene.tweens.killTweensOf(this.healthBar);
+
+        // Animate width change smoothly with snappy timing
+        this.scene.tweens.add({
+            targets: this.healthBar,
+            width: newWidth,
+            duration: 150, // Very fast animation
+            ease: 'Elastic.easeOut', // Elastic bounce effect
+            onUpdate: () => {
+                // Keep health bar centered on enemy during animation
+                this.healthBar.x = this.x;
+            }
+        });
 
         // Keep health bar red at all times
         this.healthBar.setFillStyle(0xff4444);
@@ -481,6 +493,9 @@ export default class Enemy {
 
     showDamagePreview(damage) {
         if (!this.isAlive) return;
+
+        // Check if damage preview is disabled in config
+        if (!UIConfig.enemy.showDamagePreview) return;
 
         // Clear existing preview first
         this.hideDamagePreview();

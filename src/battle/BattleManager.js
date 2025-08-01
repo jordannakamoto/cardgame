@@ -904,8 +904,7 @@ export default class BattleManager {
                 this.handleHeroDeath(targetHero);
             }
 
-            // Update hero display
-            this.scene.updateHeroPortraits();
+            // Hero display will be updated automatically by the heroDamageTaken event
 
             // Check for game over after hero takes damage
             if (this.getAliveHeroes().length === 0) {
@@ -1000,8 +999,8 @@ export default class BattleManager {
             }
         }
 
-        // Complete after animation
-        this.scene.time.delayedCall(800, onComplete);
+        // Complete after animation (reduced delay for snappier feel)
+        this.scene.time.delayedCall(400, onComplete);
     }
 
     getAliveHeroes() {
