@@ -230,10 +230,10 @@ export default class BattleScene extends Phaser.Scene {
         this.sortButton.on('pointerover', () => this.sortButton.setTint(0xdddddd));
         this.sortButton.on('pointerout', () => this.sortButton.clearTint());
 
-        // Discard counter (above theme button)
+        // Discard counter
         this.discardCounter = this.add.text(
-            screenWidth / 2 + 1050,    // Same x as theme button
-            screenHeight - 200,        // Above theme button
+            screenWidth / 2 + 1050,
+            screenHeight - 140,
             'Discards: 1/1',
             {
                 fontSize: '32px',
@@ -246,25 +246,6 @@ export default class BattleScene extends Phaser.Scene {
         this.discardCounter.setOrigin(0.5);
         this.discardCounter.setScrollFactor(0); // Keep fixed to camera
 
-        // Theme toggle button
-        this.themeButton = this.add.text(
-            screenWidth / 2 + 1050,    // Same x as sort button
-            screenHeight - 140,        // Below sort button
-            `Theme: ${getCurrentTheme().name}`,
-            {
-                fontSize: '36px',      // Slightly smaller than sort
-                color: '#ffffff',
-                fontFamily: 'Arial',
-                backgroundColor: '#444444',
-                padding: { x: 25, y: 15 }
-            }
-        );
-        this.themeButton.setOrigin(0.5);
-        this.themeButton.setScrollFactor(0); // Keep fixed to camera
-        this.themeButton.setInteractive();
-        this.themeButton.on('pointerdown', () => this.toggleCardTheme());
-        this.themeButton.on('pointerover', () => this.themeButton.setTint(0xdddddd));
-        this.themeButton.on('pointerout', () => this.themeButton.clearTint());
 
         this.updateHeroDisplay();
         this.createHeroPortraits();
@@ -1145,21 +1126,6 @@ Hover over cards for preview`;
         }
     }
 
-    toggleCardTheme() {
-        const themes = getAvailableThemes();
-        const currentTheme = getCurrentTheme();
-
-        // Simple toggle between classic and magic
-        const nextTheme = currentTheme.name === 'Classic' ? 'magic' : 'classic';
-
-        setCardTheme(nextTheme);
-        this.themeButton.setText(`Theme: ${getCurrentTheme().name}`);
-
-        // Refresh the current hand display to show new theme
-        if (this.battleManager && this.battleManager.playerHand) {
-            this.updateHandDisplay(this.battleManager.playerHand, this.battleManager.selectedCards);
-        }
-    }
 
     animateDiscard(cardsToDiscard, onComplete) {
         console.log('[ANIM] animateDiscard called with cards:', cardsToDiscard.map(c => c.toString()));
