@@ -1,5 +1,6 @@
 import { PerspectiveConfig } from '../config/PerspectiveConfig.js';
 import { UIConfig } from '../config/UIConfig.js';
+import { EnemyDamageFeedback } from './EnemyDamageFeedback.js';
 
 export default class Enemy {
     constructor(scene, x, y, config) {
@@ -30,6 +31,9 @@ export default class Enemy {
         this.targetScaleTween = null;
         this.targetArrow = null;
         this.targetOrb = null;
+
+        // Initialize damage feedback system
+        this.damageFeedback = new EnemyDamageFeedback(scene);
 
         this.createVisuals();
     }
@@ -164,12 +168,12 @@ export default class Enemy {
         // Screen shake for special attacks
         if (options.isSpecialAttack) {
             const camera = this.scene.cameras.main;
-            camera.shake(200, 0.008); // More noticeable shake when damage is applied
+            camera.shake(200, 0.008);
         }
 
-        // Create damage text
-        const damageText = this.scene.add.text(this.x, this.y - 90, `-${amount}`, {  // 60 * 1.5
-            fontSize: '60px',  // 40 * 1.5
+        // Create damage text (at enemy center, like getting hit)
+        const damageText = this.scene.add.text(this.x, this.y - 50, `-${amount}`, {
+            fontSize: '60px',
             color: '#ff0000',
             fontFamily: 'Arial',
             fontStyle: 'bold'
@@ -186,32 +190,8 @@ export default class Enemy {
             onComplete: () => damageText.destroy()
         });
 
-        // Flash red (different methods for image vs rectangle)
-        if (this.sprite) {
-            if (this.isImageSprite) {
-                this.scene.tweens.add({
-                    targets: this.sprite,
-                    tint: 0xff0000,
-                    duration: 100,
-                    yoyo: true,
-                    onComplete: () => {
-                        this.sprite.clearTint();
-                    }
-                });
-            } else {
-                // For rectangles, use fillColor
-                const originalColor = this.sprite.fillColor;
-                this.scene.tweens.add({
-                    targets: this.sprite,
-                    fillColor: 0xff0000,
-                    duration: 100,
-                    yoyo: true,
-                    onComplete: () => {
-                        this.sprite.setFillStyle(originalColor);
-                    }
-                });
-            }
-        }
+        // Apply all damage feedback effects
+        this.damageFeedback.applyDamageEffects(this, amount);
 
         if (this.currentHealth <= 0) {
             this.die();

@@ -723,21 +723,6 @@ export default class BattleManager {
     }
 
     displayHandResult(pokerHand, finalDamage) {
-        // Create floating text showing the hand type and final damage
-        const resultText = this.scene.add.text(
-            this.scene.cameras.main.centerX,
-            150,
-            `${pokerHand.handName}\n${finalDamage} damage!`,
-            {
-                fontSize: '24px',
-                color: '#ffff00',
-                fontFamily: 'Arial',
-                align: 'center',
-                fontStyle: 'bold'
-            }
-        );
-        resultText.setOrigin(0.5);
-
         // Check if hero modified damage and animate portrait if so
         const baseDamage = this.calculateDamage(pokerHand);
         const heroModified = finalDamage !== baseDamage;
@@ -746,16 +731,8 @@ export default class BattleManager {
             // Animate the hero portrait when attack executes
             this.animateHeroAttackBonus();
         }
-
-        // Animate the result
-        this.scene.tweens.add({
-            targets: resultText,
-            y: resultText.y - 50,
-            alpha: 0,
-            duration: 2000,
-            ease: 'Power2',
-            onComplete: () => resultText.destroy()
-        });
+        
+        // Damage numbers are handled by the enemy's takeDamage method
     }
 
     animateHeroAttackBonus() {
