@@ -15,7 +15,7 @@ export const HAND_RANKINGS = {
 
 export const HAND_NAMES = {
     [HAND_RANKINGS.HIGH_CARD]: 'High Card',
-    [HAND_RANKINGS.ONE_PAIR]: 'One Pair',
+    [HAND_RANKINGS.ONE_PAIR]: 'Pair',
     [HAND_RANKINGS.TWO_PAIR]: 'Two Pair',
     [HAND_RANKINGS.THREE_OF_A_KIND]: 'Three of a Kind',
     [HAND_RANKINGS.STRAIGHT]: 'Straight',

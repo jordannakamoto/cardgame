@@ -89,7 +89,7 @@ class DefensiveHandTrigger extends Trigger {
 
     check(pokerHand, context, heroState) {
         if (!pokerHand) return false;
-        return pokerHand.handName === 'High Card' || pokerHand.handName === 'One Pair';
+        return pokerHand.handName === 'High Card' || pokerHand.handName === 'Pair';
     }
 }
 

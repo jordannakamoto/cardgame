@@ -88,8 +88,8 @@ export const UIConfig = {
         },
         handPreview: {
             position: 'right',  // 'left' or 'right' - independent from ability/mana panels
-            offsetX: 450,      // Moved back right a bit
-            offsetY: 400,      // Moved up more
+            offsetX: 450,      // Closer to right edge (more to the right)
+            offsetY: 350,      // Lower on screen (further down)
             width: 350,
             height: 80
         }

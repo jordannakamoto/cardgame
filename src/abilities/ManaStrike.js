@@ -112,7 +112,7 @@ export default class ManaStrike extends ActiveAbility {
     }
     
     showDamageText(target, damage, scene) {
-        const damageText = scene.add.text(target.x, target.y - 120, `★ ${damage}`, {
+        const damageText = scene.add.text(target.x, target.y - 120, `${damage}`, {
             fontSize: '48px',
             color: '#ffffff',
             fontFamily: 'Arial',

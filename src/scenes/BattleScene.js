@@ -166,8 +166,8 @@ export default class BattleScene extends Phaser.Scene {
         // Create hand preview panel
         this.handPreviewPanel = new HandPreviewPanel(this);
         
-        // Set Persona 5 theme for testing
-        this.handPreviewPanel.setTheme('persona5');
+        // Make accessible globally for console commands
+        window.handPreviewPanel = this.handPreviewPanel;
 
         // Gold display with symbol
         this.goldDisplay = this.add.text(

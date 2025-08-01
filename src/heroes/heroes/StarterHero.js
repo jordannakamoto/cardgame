@@ -23,7 +23,7 @@ export default class StarterHero extends Hero {
             name: 'Pair Master',
             description: '+50% damage with pairs',
             triggers: [
-                new HandTypeTrigger(['One Pair'])
+                new HandTypeTrigger(['Pair'])
             ],
             effects: [
                 new MultiplierEffect(1.5)
