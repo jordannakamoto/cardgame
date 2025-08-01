@@ -17,12 +17,12 @@ export const UIConfig = {
         
         // Tooltip settings
         tooltip: {
-            width: 900,          // 600 * 1.5
-            height: 450,         // 300 * 1.5
-            fontSize: 63,        // 42 * 1.5
-            nameSize: 72,        // 48 * 1.5
-            minFontSize: 57,     // 38 * 1.5
-            maxFontSize: 81      // 54 * 1.5
+            width: 720,          // Reduced from 900 for better fit
+            height: 180,         // Even smaller for compact display
+            fontSize: 28,        // 1/3 smaller than 42
+            nameSize: 32,        // 1/3 smaller than 48
+            minFontSize: 24,     // 1/3 smaller than 36
+            maxFontSize: 35      // 1/3 smaller than 52
         },
         
         // Mana bar settings (now used for HP bar)
@@ -79,9 +79,9 @@ export function updateUIConfig() {
         const width = window.innerWidth || 2560;
         const scale = Math.max(0.8, Math.min(2.0, width / 2560));
         
-        // Update tooltip font sizes based on screen size
-        UIConfig.hero.tooltip.fontSize = Math.max(38, Math.floor(42 * scale));
-        UIConfig.hero.tooltip.nameSize = Math.max(42, Math.floor(48 * scale));
+        // Update tooltip font sizes based on screen size (1/3 smaller)
+        UIConfig.hero.tooltip.fontSize = Math.max(24, Math.floor(28 * scale));
+        UIConfig.hero.tooltip.nameSize = Math.max(28, Math.floor(32 * scale));
     }
 }
 

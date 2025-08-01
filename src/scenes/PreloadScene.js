@@ -8,7 +8,7 @@ export default class PreloadScene extends Phaser.Scene {
 
     preload() {
         this.load.setBaseURL('assets');
-        
+
         // Dynamically load enemy art from EnemyTypes
         Object.values(EnemyTypes).forEach(enemyType => {
             if (enemyType.artPath) {
@@ -17,35 +17,35 @@ export default class PreloadScene extends Phaser.Scene {
                 this.load.image(textureKey, artPath);
             }
         });
-        
+
         // Load hero portraits
         this.load.image('warrior2', 'heroes/warrior2.png');
         this.load.image('mage1', 'heroes/mage1.png');
         this.load.image('mage2', 'heroes/mage2.png');
         this.load.image('guardian1', 'heroes/guardian1.png');
         this.load.image('jackpot1', 'heroes/jackpot1.png');
-        
+
         // Load joker card artwork
         this.load.image('warrior2_joker', 'heroes/warrior2_joker.png');
-        
+
         // Load pack art
         this.load.image('pack_basic1', 'packs/basic1.png');
-        
+
         // Load battle backdrop
-        this.load.image('battle-backdrop', 'battle/backdrop.png');
-        
+        this.load.image('battle-backdrop', 'battle/backdrop7.png');
+
         this.createLoadingBar();
     }
 
     createLoadingBar() {
         const width = this.cameras.main.width;
         const height = this.cameras.main.height;
-        
+
         const progressBar = this.add.graphics();
         const progressBox = this.add.graphics();
         progressBox.fillStyle(0x222222, 0.8);
         progressBox.fillRect(width / 2 - 160, height / 2 - 25, 320, 50);
-        
+
         const loadingText = this.make.text({
             x: width / 2,
             y: height / 2 - 50,
@@ -56,13 +56,13 @@ export default class PreloadScene extends Phaser.Scene {
             }
         });
         loadingText.setOrigin(0.5, 0.5);
-        
+
         this.load.on('progress', (value) => {
             progressBar.clear();
             progressBar.fillStyle(0xffffff, 1);
             progressBar.fillRect(width / 2 - 150, height / 2 - 15, 300 * value, 30);
         });
-        
+
         this.load.on('complete', () => {
             progressBar.destroy();
             progressBox.destroy();

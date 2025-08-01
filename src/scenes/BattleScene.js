@@ -10,9 +10,9 @@ import { createHero } from '../heroes/HeroRegistry.js';
 import PartyManager from '../party/PartyManager.js';
 import { UIConfig } from '../config/UIConfig.js';
 import { setCardTheme, getCurrentTheme, getAvailableThemes } from '../config/CardThemes.js';
-import { GlassmorphismShader } from '../shaders/GlassmorphismShader.js';
 import { MysticalEffects } from '../effects/MysticalEffects.js';
 import { cardTraitRegistry } from '../game/CardTraitRegistry.js';
+import { PerspectiveConfig } from '../config/PerspectiveConfig.js';
 
 export default class BattleScene extends Phaser.Scene {
     constructor() {
@@ -35,23 +35,23 @@ export default class BattleScene extends Phaser.Scene {
     create() {
         // Note: Don't remove all event listeners as it breaks the UI system
         // Instead, rely on individual component cleanup
-        
-        // Register glassmorphism shader
-        if (!this.renderer.pipelines.get('GlassmorphismShader')) {
-            this.renderer.pipelines.add('GlassmorphismShader', new GlassmorphismShader(this.game));
-        }
-        
-        // Add battle backdrop
+
+        // Add battle backdrop with parallax support
         const screenWidth = this.cameras.main.width;
         const screenHeight = this.cameras.main.height;
-        const backdrop = this.add.image(screenWidth / 2, screenHeight / 2, 'battle-backdrop');
+        this.backdrop = this.add.image(screenWidth / 2, screenHeight / 2, 'battle-backdrop');
         
-        // Scale backdrop to cover the entire screen
-        const scaleX = screenWidth / backdrop.width;
-        const scaleY = screenHeight / backdrop.height;
-        const scale = Math.max(scaleX, scaleY);
-        backdrop.setScale(scale);
+        // Scale backdrop slightly larger than screen to allow for subtle parallax movement
+        const scaleX = screenWidth / this.backdrop.width;
+        const scaleY = screenHeight / this.backdrop.height;
+        const baseScale = Math.max(scaleX, scaleY);
+        const parallaxScale = baseScale * PerspectiveConfig.backdrop.scaleIncrease;
+        this.backdrop.setScale(parallaxScale);
         
+        // Store original position and perspective settings
+        this.backdropOriginalX = screenWidth / 2;
+        this.backdropOriginalY = screenHeight / 2;
+
         // Initialize managers
         this.cardManager = new CardManager(this);
         this.playerDeck = new PlayerDeck();
@@ -59,7 +59,7 @@ export default class BattleScene extends Phaser.Scene {
         if (!this.inventory) {
             this.inventory = new Inventory();
         }
-        
+
         // Initialize party manager if not provided
         if (!this.partyManager) {
             this.partyManager = new PartyManager(this);
@@ -67,9 +67,9 @@ export default class BattleScene extends Phaser.Scene {
             const starterHero = createHero('starter_hero');
             this.partyManager.purchaseHero(starterHero);
         }
-        
+
         this.heroManager = new HeroManager(this);
-        
+
         // Sync heroes from party manager to hero manager
         const partyHeroes = this.partyManager.getAllHeroes();
         console.log('Syncing heroes from PartyManager to HeroManager:', partyHeroes.length, partyHeroes.map(h => h.name));
@@ -77,30 +77,30 @@ export default class BattleScene extends Phaser.Scene {
             const success = this.heroManager.addHero(hero);
             console.log(`Added ${hero.name} to HeroManager:`, success);
         });
-        
+
         // Initialize CardManager for visual rendering only
         this.cardManager.createDeck(); // Keep for compatibility with card rendering methods
-        
+
         this.createUI();
         this.createEnemies();
         this.setupEventHandlers();
-        
+
         // Initialize card traits for this battle
         this.initializeCardTraits();
-        
+
         // Start battle after a small delay to ensure everything is initialized
         this.time.delayedCall(100, () => {
             this.battleManager.startPlayerTurn();
-            
+
             // Initialize discard counter display
             this.updateDiscardCounter(this.battleManager.discardsRemaining, this.battleManager.maxDiscards);
         });
     }
-    
+
     createUI() {
         const screenWidth = this.cameras.main.width;
         const screenHeight = this.cameras.main.height;
-        
+
         // Battle title (removed - backdrop provides context)
         // this.titleText = this.add.text(
         //     screenWidth / 2,
@@ -114,7 +114,7 @@ export default class BattleScene extends Phaser.Scene {
         //     }
         // );
         // this.titleText.setOrigin(0.5);
-        
+
         // Info button (small 'i' in corner)
         this.infoButton = this.add.text(
             screenWidth - 90,
@@ -135,25 +135,25 @@ export default class BattleScene extends Phaser.Scene {
         this.infoButton.on('pointerdown', () => this.toggleInfoMenu());
         this.infoButton.on('pointerover', () => this.infoButton.setTint(0xffffff));
         this.infoButton.on('pointerout', () => this.infoButton.clearTint());
-        
+
         // Info menu (initially hidden)
         this.infoMenu = this.add.container(screenWidth / 2, screenHeight / 2);
         this.infoMenu.setScrollFactor(0); // Keep fixed to camera
         this.createInfoMenu();
         this.infoMenu.setVisible(false);
         this.infoMenuVisible = false;
-        
+
         // Hand cards display area at bottom
         this.handCardsContainer = this.add.container(screenWidth / 2, screenHeight - 140);  // Cards back at bottom
         this.handCardsContainer.setScrollFactor(0); // Keep cards fixed to camera
-        
+
         // Hero portraits area (above cards)
         this.heroPortraitsContainer = this.add.container(screenWidth / 2, screenHeight - 480);  // Portraits back above cards
         this.heroPortraitsContainer.setScrollFactor(0); // Keep hero portraits fixed to camera
-        
+
         // Create damage calculation panel
         this.createDamagePanel();
-        
+
         // Gold display with symbol
         this.goldDisplay = this.add.text(
             90,                     // 60 * 1.5
@@ -168,10 +168,10 @@ export default class BattleScene extends Phaser.Scene {
         );
         this.goldDisplay.setOrigin(0, 0.5);
         this.goldDisplay.setScrollFactor(0); // Keep fixed to camera
-        
+
         // Update gold display with current inventory amount
         this.updateGoldDisplay();
-        
+
         // Hero display (removed - now shown in portraits)
         // this.heroDisplay = this.add.text(
         //     90,                     // 60 * 1.5
@@ -184,7 +184,7 @@ export default class BattleScene extends Phaser.Scene {
         //     }
         // );
         // this.heroDisplay.setOrigin(0, 0.5);
-        
+
         // Mana display (hidden for now)
         this.manaDisplay = this.add.text(
             60,
@@ -198,7 +198,7 @@ export default class BattleScene extends Phaser.Scene {
         );
         this.manaDisplay.setOrigin(0, 0.5);
         this.manaDisplay.setVisible(false); // Hide mana display
-        
+
         // Sort toggle button (positioned to the right of card hand area)
         this.sortButton = this.add.text(
             screenWidth / 2 + 1050,    // 700 * 1.5
@@ -218,7 +218,7 @@ export default class BattleScene extends Phaser.Scene {
         this.sortButton.on('pointerdown', () => this.battleManager.toggleSortMode());
         this.sortButton.on('pointerover', () => this.sortButton.setTint(0xdddddd));
         this.sortButton.on('pointerout', () => this.sortButton.clearTint());
-        
+
         // Discard counter (above theme button)
         this.discardCounter = this.add.text(
             screenWidth / 2 + 1050,    // Same x as theme button
@@ -234,7 +234,7 @@ export default class BattleScene extends Phaser.Scene {
         );
         this.discardCounter.setOrigin(0.5);
         this.discardCounter.setScrollFactor(0); // Keep fixed to camera
-        
+
         // Theme toggle button
         this.themeButton = this.add.text(
             screenWidth / 2 + 1050,    // Same x as sort button
@@ -254,19 +254,19 @@ export default class BattleScene extends Phaser.Scene {
         this.themeButton.on('pointerdown', () => this.toggleCardTheme());
         this.themeButton.on('pointerover', () => this.themeButton.setTint(0xdddddd));
         this.themeButton.on('pointerout', () => this.themeButton.clearTint());
-        
+
         this.updateHeroDisplay();
         this.createHeroPortraits();
     }
-    
+
     createDamagePanel() {
         const screenWidth = this.cameras.main.width;
         const screenHeight = this.cameras.main.height;
-        
+
         // Create panel container positioned in bottom left corner
         this.damagePanelContainer = this.add.container(90, screenHeight - 90); // Bottom left corner
         this.damagePanelContainer.setScrollFactor(0); // Keep fixed to camera
-        
+
         // Panel background
         const panelWidth = 350;
         const panelHeight = 80;
@@ -275,11 +275,11 @@ export default class BattleScene extends Phaser.Scene {
         panelBg.fillRoundedRect(0, 0, panelWidth, panelHeight, 12);
         panelBg.lineStyle(3, 0x555555, 0.8);
         panelBg.strokeRoundedRect(0, 0, panelWidth, panelHeight, 12);
-        
+
         // Inner glow
         panelBg.lineStyle(1, 0x888888, 0.4);
         panelBg.strokeRoundedRect(4, 4, panelWidth - 8, panelHeight - 8, 8);
-        
+
         // Damage preview text
         this.handPreview = this.add.text(
             panelWidth / 2,
@@ -294,11 +294,11 @@ export default class BattleScene extends Phaser.Scene {
             }
         );
         this.handPreview.setOrigin(0.5);
-        
+
         // Add elements to container
         this.damagePanelContainer.add([panelBg, this.handPreview]);
     }
-    
+
     createEnemies() {
         // Create enemies using the new type system
         const enemyTypes = [
@@ -306,65 +306,65 @@ export default class BattleScene extends Phaser.Scene {
             EnemyTypes.ORC,
             EnemyTypes.TROLL
         ];
-        
+
         const screenWidth = this.cameras.main.width;
         const spacing = 600;  // 400 * 1.5
         const totalWidth = (enemyTypes.length - 1) * spacing;
         const startX = (screenWidth - totalWidth) / 2;
         const y = 350;  // Moved up further from 450 to 350
-        
+
         enemyTypes.forEach((enemyType, index) => {
             const enemy = EnemyFactory.createEnemy(this, startX + (index * spacing), y, enemyType);
             this.battleManager.addEnemy(enemy);
         });
     }
-    
+
     setupEventHandlers() {
         // Listen for hand changes
         this.events.on('handChanged', this.updateHandDisplay, this);
-        
+
         // Listen for gold earned
         this.events.on('goldEarned', this.onGoldEarned, this);
-        
+
         // Listen for mana changes
         this.events.on('manaChanged', this.updateManaDisplay, this);
-        
+
         // Listen for hero changes
         this.events.on('activeHeroChanged', this.updateHeroPortraits, this);
-        
+
         // Listen for sort mode changes
         this.events.on('sortModeChanged', this.updateSortButtonText, this);
-        
+
         // Listen for discard changes
         this.events.on('discardsChanged', this.updateDiscardCounter, this);
-        
+
         // Info menu toggle with 'I' key
         this.input.keyboard.on('keydown-I', () => {
             this.toggleInfoMenu();
         });
-        
+
         // Sort toggle with 'S' key
         this.input.keyboard.on('keydown-S', () => {
             this.battleManager.toggleSortMode();
         });
     }
-    
+
     // Initialize card traits for this battle session
     initializeCardTraits() {
         console.log('Initializing card traits for battle...');
-        
+
         // Get all cards from player deck
         const allCards = this.playerDeck.getAllCards();
-        
+
         // Get current party heroes
         const partyHeroes = this.partyManager.getAllHeroes();
-        
+
         // Initialize traits based on active heroes
         cardTraitRegistry.initializeForBattle(allCards, partyHeroes);
-        
+
         console.log(`Card traits initialized for ${allCards.length} cards with ${partyHeroes.length} heroes`);
     }
-    
+
     createInfoMenu() {
         // Semi-transparent background
         const bg = this.add.graphics();
@@ -372,7 +372,7 @@ export default class BattleScene extends Phaser.Scene {
         bg.fillRoundedRect(-200, -150, 400, 300, 10);
         bg.lineStyle(2, 0xffffff, 0.8);
         bg.strokeRoundedRect(-200, -150, 400, 300, 10);
-        
+
         // Title
         const title = this.add.text(0, -120, 'CONTROLS & INFO', {
             fontSize: '20px',
@@ -381,7 +381,7 @@ export default class BattleScene extends Phaser.Scene {
             fontStyle: 'bold'
         });
         title.setOrigin(0.5);
-        
+
         // Controls text
         const controlsText = `Controls:
 Arrow Keys - Target Enemy
@@ -397,7 +397,7 @@ Select up to 5 cards from your 8-card hand
 Make poker hands to damage enemies
 Selected cards move up with yellow border
 Hover over cards for preview`;
-        
+
         const controls = this.add.text(0, -20, controlsText, {
             fontSize: '14px',
             color: '#cccccc',
@@ -406,7 +406,7 @@ Hover over cards for preview`;
             lineSpacing: 4
         });
         controls.setOrigin(0.5);
-        
+
         // Close instruction
         const closeText = this.add.text(0, 110, 'Press I or click outside to close', {
             fontSize: '12px',
@@ -415,9 +415,9 @@ Hover over cards for preview`;
             fontStyle: 'italic'
         });
         closeText.setOrigin(0.5);
-        
+
         this.infoMenu.add([bg, title, controls, closeText]);
-        
+
         // Click outside to close
         bg.setInteractive();
         bg.on('pointerdown', (pointer, localX, localY) => {
@@ -427,52 +427,52 @@ Hover over cards for preview`;
             }
         });
     }
-    
+
     toggleInfoMenu() {
         this.infoMenuVisible = !this.infoMenuVisible;
         this.infoMenu.setVisible(this.infoMenuVisible);
-        
+
         if (this.infoMenuVisible) {
             // Bring to front
             this.children.bringToTop(this.infoMenu);
         }
     }
-    
+
     updateHandDisplay(cards, selectedCards = [], forceAnimation = false, newCards = []) {
         if (!cards || cards.length === 0) {
             this.handCardsContainer.removeAll(true);
             this.handPreview.setText('');
             return;
         }
-        
+
         // Update hand preview
         this.updateHandPreview(cards, selectedCards);
-        
+
         // Store previous selection state to avoid replaying animations
         if (!this.previousSelectedCards) this.previousSelectedCards = [];
-        
+
         // Check if we can optimize by only updating selection states instead of re-rendering everything
         if (this.canOptimizeSelection(cards, selectedCards, forceAnimation, newCards)) {
             this.updateCardSelectionStates(cards, selectedCards);
             this.previousSelectedCards = [...selectedCards];
             return;
         }
-        
+
         // Full re-render needed - clean up mystical effects first
         this.cleanupMysticalEffects();
-        
+
         // Clear previous hand display
         this.handCardsContainer.removeAll(true);
-        
+
         // Display cards
         const cardSpacing = UIConfig.card.spacing;  // Now 210
         const startX = -(cards.length - 1) * cardSpacing / 2;
-        
+
         // Store card containers for special attack animations
         this.cardContainers = [];
         // Store active mystical effects for cleanup
         this.activeMysticalEffects = [];
-        
+
         // Determine which cards should animate
         if (forceAnimation && newCards.length > 0) {
             // Selective animation - only animate the specific new cards passed in
@@ -488,18 +488,18 @@ Hover over cards for preview`;
             // No animation for regular updates
             this.shouldAnimateCard = (index) => false;
         }
-        
+
         this.previousCards = [...cards];
-        
+
         cards.forEach((card, index) => {
             const cardX = startX + (index * cardSpacing);
             const baseCardY = 0;
             const isSelected = selectedCards.includes(index);
             const wasSelected = this.previousSelectedCards.includes(index);
-            
+
             // Create card container for easier animation
             const cardContainer = this.add.container(cardX, isSelected ? baseCardY - 30 : baseCardY);
-            
+
             // Fan-in animation for new cards only
             if (this.shouldAnimateCard(index)) {
                 // This is a new card - animate it in
@@ -508,7 +508,7 @@ Hover over cards for preview`;
                 cardContainer.rotation = (index - (cards.length - 1) / 2) * 0.15; // Start with fan rotation
                 cardContainer.alpha = 0; // Start invisible
                 cardContainer.setScale(0.8); // Start slightly small
-                
+
                 // Calculate delay - count how many new cards come before this one
                 let newCardsBefore = 0;
                 for (let i = 0; i < index; i++) {
@@ -516,7 +516,7 @@ Hover over cards for preview`;
                         newCardsBefore++;
                     }
                 }
-                
+
                 // Animate to final position with fan effect
                 this.tweens.add({
                     targets: cardContainer,
@@ -549,12 +549,12 @@ Hover over cards for preview`;
                     ease: 'Back.out'
                 });
             }
-            
+
             // Use CardManager's improved card rendering
             const cardWidth = UIConfig.card.width;   // Now 180
             const cardHeight = UIConfig.card.height; // Now 252
             const cardData = this.cardManager.createCardSprite(card, 0, 0, cardWidth, cardHeight);
-            
+
             // Adjust the card elements' positions to be centered
             cardData.graphics.x = -cardWidth/2;
             cardData.graphics.y = -cardHeight/2;
@@ -562,19 +562,19 @@ Hover over cards for preview`;
             cardData.topRankText.y -= cardHeight/2;
             cardData.topSuitText.x -= cardWidth/2;
             cardData.topSuitText.y -= cardHeight/2;
-            
+
             // Only adjust centerSuitText position if it exists
             if (cardData.centerSuitText) {
                 cardData.centerSuitText.x -= cardWidth/2;
                 cardData.centerSuitText.y -= cardHeight/2;
             }
-            
+
             // Adjust artwork position if it exists (for joker cards)
             if (cardData.artwork) {
                 cardData.artwork.x -= cardWidth/2;
                 cardData.artwork.y -= cardHeight/2;
             }
-            
+
             // Add selection shadow
             if (isSelected) {
                 const shadow = this.add.graphics();
@@ -582,7 +582,7 @@ Hover over cards for preview`;
                 shadow.fillEllipse(0, cardHeight/2 + 15, cardWidth * 0.8, 20); // Shadow beneath card
                 shadow.setDepth(-1); // Behind the card
                 cardContainer.add(shadow);
-                
+
                 // Add mystical effect for joker cards
                 const card = cards[index];
                 if (card && card.rank === 'Joker' && card.suit === 'Wild') {
@@ -603,7 +603,7 @@ Hover over cards for preview`;
                     cardContainer.mysticalEffect = null;
                 }
             }
-            
+
             // Card number indicator (hidden for cleaner look)
             // const numberText = this.add.text(0, cardHeight/2 + 30, (index + 1).toString(), {
             //     fontSize: '36px',  // Increased from 24px
@@ -612,36 +612,36 @@ Hover over cards for preview`;
             //     fontStyle: 'bold'
             // });
             // numberText.setOrigin(0.5);
-            
+
             // Add elements to container
             const containerElements = [
                 cardData.graphics,
                 cardData.topRankText,
                 cardData.topSuitText
             ];
-            
+
             // Add center suit text if it exists (not for joker cards with artwork)
             if (cardData.centerSuitText) {
                 containerElements.push(cardData.centerSuitText);
             }
-            
+
             // Add artwork if it exists (for joker cards)
             if (cardData.artwork) {
                 containerElements.push(cardData.artwork);
             }
-            
+
             cardContainer.add(containerElements);
-            
+
             // Store card container for special attack animations and attach card data
             cardContainer.cardData = card; // Attach the card data for animation lookup
             this.cardContainers[index] = cardContainer;
-            
+
             // Make card interactive
             cardData.graphics.setInteractive(new Phaser.Geom.Rectangle(0, 0, cardWidth, cardHeight), Phaser.Geom.Rectangle.Contains);
             cardData.graphics.on('pointerdown', () => {
                 this.scene.get('BattleScene').battleManager.toggleCardSelection(index);
             });
-            
+
             // Add hover effect
             cardData.graphics.on('pointerover', () => {
                 cardContainer.setScale(1.05);
@@ -649,55 +649,55 @@ Hover over cards for preview`;
             cardData.graphics.on('pointerout', () => {
                 cardContainer.setScale(1.0);
             });
-            
+
             // Add to main container
             this.handCardsContainer.add(cardContainer);
         });
-        
+
         // Update previous selection state
         this.previousSelectedCards = [...selectedCards];
     }
-    
+
     canOptimizeSelection(cards, selectedCards, forceAnimation, newCards) {
         // Can't optimize if we need to force animation or have new cards
         if (forceAnimation || (newCards && newCards.length > 0)) {
             return false;
         }
-        
+
         // Can't optimize if we don't have existing card containers
         if (!this.cardContainers || this.cardContainers.length === 0) {
             return false;
         }
-        
+
         // Can't optimize if the number of cards changed
         if (!this.previousCards || this.previousCards.length !== cards.length) {
             return false;
         }
-        
+
         // Can't optimize if the actual cards changed (different ranks/suits)
         for (let i = 0; i < cards.length; i++) {
-            if (!this.previousCards[i] || 
-                this.previousCards[i].rank !== cards[i].rank || 
+            if (!this.previousCards[i] ||
+                this.previousCards[i].rank !== cards[i].rank ||
                 this.previousCards[i].suit !== cards[i].suit) {
                 return false;
             }
         }
-        
+
         // We can optimize - only selection states are changing
         return true;
     }
-    
+
     updateCardSelectionStates(cards, selectedCards) {
         if (!this.cardContainers) return;
-        
+
         cards.forEach((card, index) => {
             const cardContainer = this.cardContainers[index];
             if (!cardContainer) return;
-            
+
             const isSelected = selectedCards.includes(index);
             const wasSelected = this.previousSelectedCards.includes(index);
             const baseCardY = 0;
-            
+
             // Only update if selection state actually changed
             if (isSelected !== wasSelected) {
                 // Remove old selection shadow
@@ -705,7 +705,7 @@ Hover over cards for preview`;
                 if (existingShadow) {
                     existingShadow.destroy();
                 }
-                
+
                 // Clean up old mystical effect
                 if (cardContainer.mysticalEffect) {
                     cardContainer.mysticalEffect.cleanup();
@@ -715,13 +715,13 @@ Hover over cards for preview`;
                     }
                     cardContainer.mysticalEffect = null;
                 }
-                
+
                 // Clean up old chain text effect
                 if (cardContainer.chainTextEffect) {
                     cardContainer.chainTextEffect.cleanup();
                     cardContainer.chainTextEffect = null;
                 }
-                
+
                 if (isSelected) {
                     // Add selection shadow
                     const cardWidth = UIConfig.card.width;
@@ -732,20 +732,20 @@ Hover over cards for preview`;
                     shadow.setDepth(-1); // Behind the card
                     shadow.isShadow = true; // Mark for identification
                     cardContainer.add(shadow);
-                    
+
                     // Add mystical effect for joker cards
                     if (card && card.rank === 'Joker' && card.suit === 'Wild') {
                         const mysticalEffect = MysticalEffects.createJokerSelectionEffect(this, cardContainer);
                         cardContainer.mysticalEffect = mysticalEffect;
                         this.activeMysticalEffects.push(mysticalEffect);
                     }
-                    
+
                     // Add chain text for chain cards
                     if (card && card.hasChain && card.hasChain()) {
                         const chainTextEffect = this.createChainSelectionText(cardContainer);
                         cardContainer.chainTextEffect = chainTextEffect;
                     }
-                    
+
                     // Animate to selected position
                     this.tweens.add({
                         targets: cardContainer,
@@ -765,7 +765,7 @@ Hover over cards for preview`;
             }
         });
     }
-    
+
     cleanupMysticalEffects() {
         if (this.activeMysticalEffects) {
             this.activeMysticalEffects.forEach(effect => {
@@ -776,12 +776,12 @@ Hover over cards for preview`;
             this.activeMysticalEffects = [];
         }
     }
-    
+
     createChainSelectionText(cardContainer) {
         const worldTransform = cardContainer.getWorldTransformMatrix();
         const cardX = worldTransform.tx;
         const cardY = worldTransform.ty;
-        
+
         // Create stylized "CHAIN" text above the card
         const chainText = this.add.text(
             cardX,
@@ -790,7 +790,7 @@ Hover over cards for preview`;
             {
                 fontSize: '32px',
                 color: '#ff6600',
-                fontFamily: 'Arial',  
+                fontFamily: 'Arial',
                 fontStyle: 'bold italic',
                 stroke: '#000000',
                 strokeThickness: 3
@@ -800,7 +800,7 @@ Hover over cards for preview`;
         chainText.setDepth(10000);
         chainText.setRotation(-0.15); // Slight slant
         chainText.setAlpha(0);
-        
+
         // Animate in
         this.tweens.add({
             targets: chainText,
@@ -811,7 +811,7 @@ Hover over cards for preview`;
             duration: 200,
             ease: 'Back.out'
         });
-        
+
         return {
             element: chainText,
             cleanup: () => {
@@ -832,7 +832,7 @@ Hover over cards for preview`;
             }
         };
     }
-    
+
     updateHandPreview(cards, selectedCards) {
         if (selectedCards.length === 0) {
             this.handPreview.setText('');
@@ -842,20 +842,20 @@ Hover over cards for preview`;
             this.updateHeroActivationIndicator(false);
             return;
         }
-        
+
         try {
             // Get selected cards
             const selectedCardObjects = selectedCards.map(index => cards[index]);
-            
+
             // Check if any selected card has chain trait
             const chainCard = selectedCardObjects.find(card => card.hasChain && card.hasChain());
-            
+
             // Import PokerHand dynamically to avoid circular imports
             import('../game/PokerHand.js').then(module => {
                 const PokerHand = module.default;
                 const battleManager = this.scene.get('BattleScene').battleManager;
                 const currentTarget = battleManager.getCurrentTarget();
-                
+
                 // Only calculate damage if target is alive
                 if (!currentTarget || !currentTarget.isAlive || currentTarget.currentHealth <= 0) {
                     this.handPreview.setText('');
@@ -863,19 +863,19 @@ Hover over cards for preview`;
                     this.updateHeroActivationIndicator([]);
                     return;
                 }
-                
+
                 let finalDamage, previewText, activatedHeroes = [];
-                
+
                 if (chainCard) {
                     // Calculate chain damage preview
                     const chainLinks = battleManager.createChainLinks(selectedCardObjects, currentTarget);
-                    
+
                     // Get additional hands from remaining cards
                     const remainingCards = battleManager.playerHand.filter((card, index) => !selectedCards.includes(index));
                     const chainData = chainCard.getChainData();
                     const maxChainLinks = chainData.maxChainLinks || 3;
                     const additionalHands = battleManager.findChainableHands(remainingCards, Math.max(0, maxChainLinks - chainLinks.length));
-                    
+
                     // Combine all hands for total damage
                     const allHands = [
                         ...chainLinks,
@@ -885,14 +885,14 @@ Hover over cards for preview`;
                             cards: handData.cards
                         }))
                     ];
-                    
+
                     finalDamage = allHands.reduce((sum, hand) => sum + hand.damage, 0);
-                    
+
                     // Create chain preview text
                     const linkCount = allHands.length;
                     const primaryHandName = chainLinks[0] ? chainLinks[0].handName : 'Chain';
                     previewText = `${primaryHandName} Chain (${linkCount} links) : ${finalDamage}`;
-                    
+
                     // Check for hero activation (use first chain link for hero calculations)
                     if (this.scene.get('BattleScene').heroManager && chainLinks.length > 0) {
                         const firstLinkHand = new PokerHand(chainLinks[0].cards);
@@ -900,7 +900,7 @@ Hover over cards for preview`;
                             targetEnemy: currentTarget,
                             selectedCards: chainLinks[0].cards
                         };
-                        
+
                         this.scene.get('BattleScene').heroManager.getAllHeroes().forEach(hero => {
                             const heroMultiplier = hero.calculateMultiplier(firstLinkHand, context);
                             if (hero.hasActivatedAbilities()) {
@@ -915,18 +915,18 @@ Hover over cards for preview`;
                     // Calculate normal damage
                     const pokerHand = new PokerHand(selectedCardObjects);
                     const baseDamage = battleManager.calculateDamage(pokerHand);
-                    
+
                     // Calculate hero modified damage
                     finalDamage = baseDamage;
                     let heroModified = false;
-                    
+
                     // Check which heroes will activate for this hand
                     if (this.scene.get('BattleScene').heroManager) {
                         const context = {
                             targetEnemy: currentTarget,
                             selectedCards: selectedCardObjects
                         };
-                        
+
                         // Check each hero individually to see which ones activate
                         this.scene.get('BattleScene').heroManager.getAllHeroes().forEach(hero => {
                             const heroMultiplier = hero.calculateMultiplier(pokerHand, context);
@@ -937,23 +937,23 @@ Hover over cards for preview`;
                                 });
                             }
                         });
-                        
+
                         finalDamage = this.scene.get('BattleScene').heroManager.calculateDamageWithHero(baseDamage, pokerHand, context);
                         heroModified = finalDamage !== baseDamage;
                     }
-                    
+
                     // Update preview text with normal format
                     previewText = `${pokerHand.handName} : ${baseDamage}`;
                     if (heroModified) {
                         previewText += ` (+${finalDamage - baseDamage})`;
                     }
                 }
-                
+
                 this.handPreview.setText(previewText);
-                
+
                 // Indicate hero ability activation in portrait
                 this.updateHeroActivationIndicator(activatedHeroes);
-                
+
                 // Update target health bar indicator
                 this.updateTargetDamageIndicator(finalDamage);
             });
@@ -961,29 +961,29 @@ Hover over cards for preview`;
             this.handPreview.setText('Invalid hand selection');
         }
     }
-    
+
     updateTargetDamageIndicator(damage) {
         const battleManager = this.scene.get('BattleScene').battleManager;
         const targetEnemy = battleManager.getCurrentTarget();
-        
+
         // Clear indicators from all enemies first
         battleManager.enemies.forEach(enemy => {
             enemy.hideDamagePreview();
         });
-        
+
         // Then show preview on current target only if it's alive
         if (targetEnemy && targetEnemy.isAlive && targetEnemy.currentHealth > 0) {
             targetEnemy.showDamagePreview(damage);
         }
     }
-    
+
     clearAllDamagePreview() {
         const battleManager = this.scene.get('BattleScene').battleManager;
         battleManager.enemies.forEach(enemy => {
             enemy.hideDamagePreview();
         });
     }
-    
+
     updateHeroActivationIndicator(activatedHeroes) {
         // Clear any existing activation effects
         if (this.heroActivationEffects) {
@@ -994,23 +994,23 @@ Hover over cards for preview`;
         }
         this.heroActivationEffects = [];
         this.heroBonusTexts = [];
-        
+
         // No need to reset portrait positions since we don't move them anymore
         if (!activatedHeroes || activatedHeroes.length === 0) {
             return;
         }
-        
+
         if (activatedHeroes && activatedHeroes.length > 0 && this.heroManager) {
             const allHeroes = this.heroManager.getAllHeroes();
             const portraitContainers = this.heroPortraitsContainer.list;
-            
+
             // Show activation effects for each activated hero
             activatedHeroes.forEach(heroData => {
                 const activatedHero = heroData.hero;
                 const heroIndex = allHeroes.indexOf(activatedHero);
                 if (heroIndex !== -1 && portraitContainers[heroIndex]) {
                     const portraitContainer = portraitContainers[heroIndex];
-                    
+
                     // Determine color based on activated ability types
                     let glowColor = UIConfig.hero.abilityColors.damage; // Default
                     if (heroData.abilities && heroData.abilities.length > 0) {
@@ -1018,21 +1018,21 @@ Hover over cards for preview`;
                         const abilityType = heroData.abilities[0].type || 'damage';
                         glowColor = UIConfig.hero.abilityColors[abilityType] || UIConfig.hero.abilityColors.damage;
                     }
-                    
+
                     // Create glowing effect around activated hero portrait as part of the container
                     const glowEffect = this.add.graphics();
                     glowEffect.lineStyle(UIConfig.hero.glowThickness, glowColor, 1.0);
                     glowEffect.strokeRoundedRect(
-                        -UIConfig.hero.portraitWidth/2 - 5, 
-                        -UIConfig.hero.portraitHeight/2 - 5, 
-                        UIConfig.hero.portraitWidth + 10, 
-                        UIConfig.hero.portraitHeight + 10, 
+                        -UIConfig.hero.portraitWidth/2 - 5,
+                        -UIConfig.hero.portraitHeight/2 - 5,
+                        UIConfig.hero.portraitWidth + 10,
+                        UIConfig.hero.portraitHeight + 10,
                         12
                     );
-                    
+
                     // Add glow effect to the portrait container so it renders with proper layering
                     portraitContainer.addAt(glowEffect, 0); // Add at index 0 so it renders behind other elements
-                    
+
                     // Add pulsing animation
                     this.tweens.add({
                         targets: glowEffect,
@@ -1042,14 +1042,14 @@ Hover over cards for preview`;
                         repeat: -1,
                         ease: 'Sine.easeInOut'
                     });
-                    
+
                     // Store original position for bonus text positioning
                     if (portraitContainer.originalY === undefined) {
                         portraitContainer.originalY = portraitContainer.y;
                     }
-                    
+
                     // No portrait elevation - keep portraits in original position to reduce visual noise
-                    
+
                     // Add bonus indicator text next to portrait
                     const heroBonusText = this.add.text(
                         this.heroPortraitsContainer.x + portraitContainer.x + 90,
@@ -1063,7 +1063,7 @@ Hover over cards for preview`;
                         }
                     );
                     heroBonusText.setOrigin(0.5);
-                    
+
                     // Add pulsing animation to bonus text only
                     this.tweens.add({
                         targets: heroBonusText,
@@ -1074,24 +1074,24 @@ Hover over cards for preview`;
                         repeat: -1,
                         ease: 'Sine.easeInOut'
                     });
-                    
+
                     this.heroActivationEffects.push(glowEffect);
                     this.heroBonusTexts.push(heroBonusText);
                 }
             });
         }
     }
-    
+
     onGoldEarned(amount) {
         this.inventory.addResource('gold', amount);
         this.updateGoldDisplay();
     }
-    
+
     updateGoldDisplay() {
         const gold = this.inventory.getResource('gold');
         this.goldDisplay.setText(`🪙 ${gold}`);
     }
-    
+
     updateHeroDisplay() {
         // Hero display removed - now shown in portraits
         // const hero = this.heroManager.getActiveHero();
@@ -1100,20 +1100,20 @@ Hover over cards for preview`;
         //     // this.updateManaDisplay(hero.currentMana, hero.maxMana); // Disabled for now
         // }
     }
-    
+
     updateManaDisplay(current, max) {
         this.manaDisplay.setText(`Mana: ${current}/${max}`);
     }
-    
+
     updateSortButtonText(sortByRank) {
         // Show what mode it will switch TO, not what it's currently on
         this.sortButton.setText(sortByRank ? 'Sort: Suit' : 'Sort: Rank');
     }
-    
+
     updateDiscardCounter(remaining, max) {
         if (this.discardCounter) {
             this.discardCounter.setText(`Discards: ${remaining}/${max}`);
-            
+
             // Change color based on availability
             if (remaining > 0) {
                 this.discardCounter.setStyle({ color: '#ffaa44' }); // Orange when available
@@ -1122,36 +1122,36 @@ Hover over cards for preview`;
             }
         }
     }
-    
+
     toggleCardTheme() {
         const themes = getAvailableThemes();
         const currentTheme = getCurrentTheme();
-        
+
         // Simple toggle between classic and magic
         const nextTheme = currentTheme.name === 'Classic' ? 'magic' : 'classic';
-        
+
         setCardTheme(nextTheme);
         this.themeButton.setText(`Theme: ${getCurrentTheme().name}`);
-        
+
         // Refresh the current hand display to show new theme
         if (this.battleManager && this.battleManager.playerHand) {
             this.updateHandDisplay(this.battleManager.playerHand, this.battleManager.selectedCards);
         }
     }
-    
+
     animateDiscard(cardsToDiscard, onComplete) {
         console.log('[ANIM] animateDiscard called with cards:', cardsToDiscard.map(c => c.toString()));
         console.log('[ANIM] cardContainers:', this.cardContainers ? this.cardContainers.length : 'undefined');
-        
+
         // Find the card containers for the cards to discard
         const discardContainers = [];
-        
+
         if (!this.cardContainers) {
             console.error('[ANIM] No cardContainers found! Calling onComplete immediately.');
             onComplete();
             return;
         }
-        
+
         // Debug: log all containers
         console.log('[ANIM] Available containers:');
         this.cardContainers.forEach((container, i) => {
@@ -1159,34 +1159,34 @@ Hover over cards for preview`;
                 console.log(`  [${i}] ${container.cardData.rank} of ${container.cardData.suit}`);
             }
         });
-        
+
         cardsToDiscard.forEach(card => {
             const container = this.cardContainers.find(container => {
                 if (!container || !container.cardData) return false;
-                const matches = container.cardData.rank === card.rank && 
+                const matches = container.cardData.rank === card.rank &&
                                container.cardData.suit === card.suit;
                 if (matches) {
                     console.log(`[ANIM] Found match for ${card.toString()}`);
                 }
                 return matches;
             });
-            
+
             if (container) {
                 discardContainers.push(container);
             } else {
                 console.warn(`[ANIM] No container found for card: ${card.toString()}`);
             }
         });
-        
+
         // Animate each card being discarded
         let animationsComplete = 0;
         const totalAnimations = discardContainers.length;
-        
+
         if (totalAnimations === 0) {
             onComplete();
             return;
         }
-        
+
         discardContainers.forEach((container, index) => {
             // Stagger the animations
             this.time.delayedCall(index * 50, () => {
@@ -1211,82 +1211,82 @@ Hover over cards for preview`;
             });
         });
     }
-    
+
     createHeroPortraits() {
         this.updateHeroPortraits();
     }
-    
+
     updateHeroPortraits() {
         // Clear existing portraits
         this.heroPortraitsContainer.removeAll(true);
-        
+
         const heroes = this.heroManager.getAllHeroes();
         const activeHero = this.heroManager.getActiveHero();
-        
+
         if (heroes.length === 0) return;
-        
+
         const portraitWidth = UIConfig.hero.portraitWidth;
         const portraitHeight = UIConfig.hero.portraitHeight;
         const spacing = UIConfig.hero.spacing;
         const startX = -(heroes.length - 1) * spacing / 2;
-        
+
         heroes.forEach((hero, index) => {
             const heroX = startX + (index * spacing);
             const isActive = hero === activeHero;
-            
+
             // Create hero portrait container
             const portraitContainer = this.add.container(heroX, 0);
-            
+
             // Portrait background
             const portraitBg = this.add.graphics();
             portraitBg.fillStyle(isActive ? 0x444444 : 0x222222);
             portraitBg.fillRoundedRect(-portraitWidth/2, -portraitHeight/2, portraitWidth, portraitHeight, 8);
             portraitBg.lineStyle(isActive ? 3 : 2, isActive ? 0x888888 : 0x666666);
             portraitBg.strokeRoundedRect(-portraitWidth/2, -portraitHeight/2, portraitWidth, portraitHeight, 8);
-            
+
             // Hero portrait image with cropping
             let heroImage = null;
             if (hero.portraitKey && this.textures.exists(hero.portraitKey)) {
                 heroImage = this.add.image(0, 0, hero.portraitKey);
-                
+
                 // Scale to fit width, keeping aspect ratio
                 const texture = this.textures.get(hero.portraitKey);
                 const textureWidth = texture.source[0].width;
                 const textureHeight = texture.source[0].height;
-                
+
                 // Scale to fit the width
                 const scale = (portraitWidth - 8) / textureWidth;
                 const scaledHeight = textureHeight * scale;
-                
+
                 // Set the scale and crop from bottom
                 heroImage.setScale(scale);
                 heroImage.setOrigin(0.5, 0.4); // Move origin up to show top portion
-                
+
                 // Crop to show only the top portion
                 const cropHeight = Math.min(textureHeight, textureHeight * (portraitHeight - 8) / scaledHeight);
                 heroImage.setCrop(0, 0, textureWidth, cropHeight);
             } else {
                 // Fallback colored rectangle
-                const fallbackColor = hero.type === 'damage' ? 0xff6666 : 
+                const fallbackColor = hero.type === 'damage' ? 0xff6666 :
                                     hero.type === 'support' ? 0x66ff66 : 0x6666ff;
                 heroImage = this.add.rectangle(0, 0, portraitWidth - 8, portraitHeight - 8, fallbackColor);
             }
-            
-            
+
+
             // HP bar background
             const hpBarBg = this.add.rectangle(0, portraitHeight/2 + UIConfig.hero.manaBar.offset, portraitWidth - 10, UIConfig.hero.manaBar.height, 0x333333);
-            
+
             // HP bar
             const hpPercent = hero.currentHealth / hero.maxHealth;
             const hpBarWidth = (portraitWidth - 10) * hpPercent;
             const hpBar = this.add.rectangle(
-                -(portraitWidth - 10)/2 + hpBarWidth/2, 
-                portraitHeight/2 + UIConfig.hero.manaBar.offset, 
-                hpBarWidth, 
-                UIConfig.hero.manaBar.height, 
+                -(portraitWidth - 10)/2 + hpBarWidth/2,
+                portraitHeight/2 + UIConfig.hero.manaBar.offset,
+                hpBarWidth,
+                UIConfig.hero.manaBar.height,
                 0xff4444
             );
-            
+
             // HP text
             const hpText = this.add.text(0, portraitHeight/2 + UIConfig.hero.manaBar.offset, `${hero.currentHealth}/${hero.maxHealth}`, {
                 fontSize: '30px',   // 20 * 1.5
@@ -1297,17 +1297,17 @@ Hover over cards for preview`;
                 strokeThickness: 3  // 2 * 1.5
             });
             hpText.setOrigin(0.5);
-            
+
             // Add elements to container
             portraitContainer.add([portraitBg, heroImage, hpBarBg, hpBar, hpText]);
-            
+
             // Make portrait clickable to switch heroes
             portraitBg.setInteractive(new Phaser.Geom.Rectangle(-portraitWidth/2, -portraitHeight/2, portraitWidth, portraitHeight), Phaser.Geom.Rectangle.Contains);
             portraitBg.on('pointerdown', () => {
                 this.heroManager.setActiveHero(index);
                 this.updateHeroDisplay();
             });
-            
+
             // Add hover effect with tooltip
             portraitBg.on('pointerover', () => {
                 portraitContainer.setScale(1.05);
@@ -1317,24 +1317,24 @@ Hover over cards for preview`;
                 portraitContainer.setScale(1.0);
                 this.hideHeroTooltip();
             });
-            
+
             // Add to main container
             this.heroPortraitsContainer.add(portraitContainer);
         });
     }
-    
+
     showHeroTooltip(hero, portraitContainer) {
         // Clear any existing tooltip
         this.hideHeroTooltip();
-        
+
         // Calculate tooltip position
         const tooltipX = this.heroPortraitsContainer.x + portraitContainer.x;
         const tooltipY = this.heroPortraitsContainer.y + portraitContainer.y - 120;
-        
+
         // Create tooltip container
         this.heroTooltip = this.add.container(tooltipX, tooltipY);
         this.heroTooltip.setScrollFactor(0); // Keep fixed to camera
-        
+
         // Tooltip background
         const tooltipWidth = UIConfig.hero.tooltip.width;
         const tooltipHeight = UIConfig.hero.tooltip.height;
@@ -1343,7 +1343,7 @@ Hover over cards for preview`;
         tooltipBg.fillRoundedRect(-tooltipWidth/2, -tooltipHeight/2, tooltipWidth, tooltipHeight, 8);
         tooltipBg.lineStyle(2, 0xffff00, 0.8);
         tooltipBg.strokeRoundedRect(-tooltipWidth/2, -tooltipHeight/2, tooltipWidth, tooltipHeight, 8);
-        
+
         // Hero name
         const nameText = this.add.text(0, -tooltipHeight/2 + 40, hero.name, {
             fontSize: `${UIConfig.hero.tooltip.nameSize}px`,
@@ -1353,11 +1353,11 @@ Hover over cards for preview`;
             align: 'center'
         });
         nameText.setOrigin(0.5);
-        
+
         // Abilities (main focus in new system)
         let yOffset = -tooltipHeight/2 + 90; // Start below the name with proper spacing
         const tooltipElements = [tooltipBg, nameText];
-        
+
         if (hero.abilities && hero.abilities.length > 0) {
             hero.abilities.forEach(ability => {
                 const abilityText = this.add.text(0, yOffset, ability.description, {
@@ -1383,10 +1383,10 @@ Hover over cards for preview`;
             tooltipElements.push(noAbilityText);
             yOffset += 20;
         }
-        
+
         // Add all elements to tooltip
         this.heroTooltip.add(tooltipElements);
-        
+
         // Animate tooltip appearance
         this.heroTooltip.setAlpha(0);
         this.tweens.add({
@@ -1395,11 +1395,11 @@ Hover over cards for preview`;
             duration: 200,
             ease: 'Power2'
         });
-        
+
         // Bring tooltip to front
         this.children.bringToTop(this.heroTooltip);
     }
-    
+
     hideHeroTooltip() {
         if (this.heroTooltip) {
             this.heroTooltip.destroy();
@@ -1407,19 +1407,87 @@ Hover over cards for preview`;
         }
     }
 
+    // Perspective skew effect - distort background based on viewing angle
+    updateBackdropParallax(enemyIndex) {
+        console.log('updateBackdropParallax called with enemyIndex:', enemyIndex);
+        
+        if (!this.backdrop || !this.battleManager.enemies || this.battleManager.enemies.length === 0) {
+            console.log('Parallax aborted: missing backdrop or enemies');
+            return;
+        }
+
+        const targetEnemy = this.battleManager.enemies[enemyIndex];
+        if (!targetEnemy) {
+            console.log('Parallax aborted: no target enemy at index', enemyIndex);
+            return;
+        }
+
+        const screenWidth = this.cameras.main.width;
+        const screenCenter = screenWidth / 2;
+        
+        // Calculate the viewing angle based on target enemy
+        const focusPoint = targetEnemy.x;
+        const viewingAngle = (focusPoint - screenCenter) / screenCenter; // -1 to 1
+        
+        // Store original enemy sprite positions if not already stored
+        if (!this.enemyOriginalPositions) {
+            this.enemyOriginalPositions = this.battleManager.enemies.map(enemy => ({
+                x: enemy.sprite.x,
+                y: enemy.sprite.y
+            }));
+        }
+
+        // Calculate perspective effects using config values
+        const perspectiveRange = PerspectiveConfig.backdrop.perspectiveRange;
+        const backgroundShift = -viewingAngle * (perspectiveRange * PerspectiveConfig.backdrop.backgroundShiftMultiplier);
+        const enemyShift = viewingAngle * (perspectiveRange * PerspectiveConfig.enemies.shiftMultiplier);
+        const perspectiveRotation = viewingAngle * PerspectiveConfig.backdrop.rotationMultiplier;
+        
+        console.log('Parallax calculations:', {
+            viewingAngle,
+            backgroundShift,
+            enemyShift,
+            perspectiveRotation,
+            targetEnemyX: targetEnemy.x
+        });
+        
+        // Animate backdrop
+        this.tweens.add({
+            targets: this.backdrop,
+            x: this.backdropOriginalX + backgroundShift,
+            y: this.backdropOriginalY,
+            rotation: perspectiveRotation,
+            duration: PerspectiveConfig.backdrop.animationDuration,
+            ease: PerspectiveConfig.backdrop.animationEasing
+        });
+        
+        // Move enemies very slightly to maintain perspective relationship
+        // IMPORTANT: Only animate position, don't interfere with breathing scale animations
+        this.battleManager.enemies.forEach((enemy, index) => {
+            if (this.enemyOriginalPositions[index]) {
+                this.tweens.add({
+                    targets: enemy.sprite, // Target the sprite directly, not the enemy wrapper
+                    x: this.enemyOriginalPositions[index].x + enemyShift, // Move from original position
+                    duration: PerspectiveConfig.enemies.animationDuration,
+                    ease: PerspectiveConfig.enemies.animationEasing
+                });
+            }
+        });
+    }
+
     update() {
         // Game loop updates if needed
     }
-    
+
     shutdown() {
         // Clean up mystical effects
         this.cleanupMysticalEffects();
-        
+
         // Clean up any remaining event listeners
         if (this.battleManager) {
             this.events.removeListener('enemyDied', this.battleManager.onEnemyDied);
         }
-        
+
         // Clean up hero event subscriptions
         if (this.heroManager) {
             this.heroManager.getAllHeroes().forEach(hero => {
@@ -1428,7 +1496,7 @@ Hover over cards for preview`;
                 }
             });
         }
-        
+
         console.log('BattleScene shutdown complete');
     }
 }

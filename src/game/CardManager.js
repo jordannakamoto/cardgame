@@ -24,34 +24,6 @@ export default class CardManager {
         return this.deck;
     }
 
-    shuffleDeck() {
-        for (let i = this.deck.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [this.deck[i], this.deck[j]] = [this.deck[j], this.deck[i]];
-        }
-    }
-
-    drawCard() {
-        return this.deck.pop();
-    }
-
-    displayCards() {
-        const sampleCards = this.deck.slice(0, 5);
-        const screenWidth = this.scene.cameras.main.width;
-        const screenHeight = this.scene.cameras.main.height;
-        
-        const cardWidth = Math.min(300, screenWidth * 0.18);
-        const cardHeight = cardWidth * 1.4;
-        const cardSpacing = cardWidth * 1.2;
-        const totalWidth = (sampleCards.length * cardSpacing) - (cardSpacing - cardWidth);
-        
-        const startX = (screenWidth - totalWidth) / 2;
-        const y = screenHeight * 0.4;
-        
-        sampleCards.forEach((card, index) => {
-            this.createCardSprite(card, startX + (index * cardSpacing), y, cardWidth, cardHeight);
-        });
-    }
 
     createCardSprite(card, x, y, cardWidth = 300, cardHeight = 420) {
         const theme = getCurrentTheme();

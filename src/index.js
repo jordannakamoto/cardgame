@@ -18,18 +18,23 @@ const config = {
     render: {
         antialias: true,
         pixelArt: false,
-        roundPixels: true
+        roundPixels: false,  // Allow sub-pixel positioning for smoother scaling
+        powerPreference: 'high-performance',
+        mipmapFilter: 'LINEAR_MIPMAP_LINEAR',  // Better quality for scaled images
+        antialiasGL: true,
+        premultipliedAlpha: false
     },
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH,
+        fullscreenTarget: 'game-container',
         min: {
             width: 640,
             height: 360
         },
         max: {
-            width: 1920,
-            height: 1080
+            width: 2560,  // Match your canvas resolution
+            height: 1440
         }
     },
     physics: {

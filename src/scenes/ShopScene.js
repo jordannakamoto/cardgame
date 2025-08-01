@@ -1147,25 +1147,26 @@ export default class ShopScene extends Phaser.Scene {
             return; // No heroes to show
         }
         
-        // Position in bottom right area, more visible
-        const heroSectionX = screenWidth - 400;
-        const heroSectionY = screenHeight - 200;
+        // Position on left side, in upper area
+        const heroSectionX = 300;
+        const heroSectionY = screenHeight - 600;
         
         // Title for hero section
         const heroTitle = this.add.text(
             heroSectionX,
-            heroSectionY - 120,
+            heroSectionY - 60,
             'Heroes - Equipment',
             {
-                fontSize: '20px',
+                fontSize: '24px',
                 color: '#d4af37',
-                fontFamily: 'Arial'
+                fontFamily: 'Arial',
+                fontStyle: 'bold'
             }
         );
         heroTitle.setOrigin(0.5);
         
-        // Create hero portraits in horizontal layout
-        const portraitSpacing = 130;
+        // Create hero portraits in horizontal layout with wider spacing
+        const portraitSpacing = 160;  // Wider spacing for bigger portraits
         const startX = heroSectionX - (heroes.length * portraitSpacing) / 2 + portraitSpacing / 2;
         
         console.log('Starting to create hero portraits, heroes count:', heroes.length);

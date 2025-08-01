@@ -1,3 +1,5 @@
+import { PerspectiveConfig } from '../config/PerspectiveConfig.js';
+
 export default class Enemy {
     constructor(scene, x, y, config) {
         this.scene = scene;
@@ -388,15 +390,15 @@ export default class Enemy {
             ease: 'Sine.easeInOut'
         });
         
-        // 2. Very subtle camera effects
-        this.scene.cameras.main.zoomTo(1.02, 300);
+        // 2. Enhanced subtle camera effects using config values
+        this.scene.cameras.main.zoomTo(PerspectiveConfig.camera.targetingZoom, PerspectiveConfig.camera.zoomDuration);
         
-        // Barely noticeable pan - just shift 0.5% toward the enemy
+        // Enhanced pan toward the enemy using config values
         const currentCenterX = this.scene.cameras.main.width / 2;
         const currentCenterY = this.scene.cameras.main.height / 2;
-        const panX = currentCenterX + (this.x - currentCenterX) * 0.005;
-        const panY = currentCenterY + (this.y - currentCenterY) * 0.005;
-        this.scene.cameras.main.pan(panX, panY, 300);
+        const panX = currentCenterX + (this.x - currentCenterX) * PerspectiveConfig.camera.targetingPan;
+        const panY = currentCenterY + (this.y - currentCenterY) * PerspectiveConfig.camera.targetingPan;
+        this.scene.cameras.main.pan(panX, panY, PerspectiveConfig.camera.panDuration);
     }
     
     hideTargetEffects() {
@@ -486,10 +488,10 @@ export default class Enemy {
         this.originalScaleX = this.sprite.scaleX;
         this.originalScaleY = this.sprite.scaleY;
         
-        // Very subtle horizontal sway
+        // Enhanced horizontal sway (more apparent)
         this.scene.tweens.add({
             targets: this.sprite,
-            x: this.x + 4,  // Subtle 4px horizontal movement
+            x: this.x + 6,  // More noticeable horizontal movement
             duration: 3000 + Math.random() * 1000, // 3-4 seconds
             ease: 'Sine.easeInOut',
             yoyo: true,
@@ -497,16 +499,27 @@ export default class Enemy {
             delay: Math.random() * 1000 // Random start delay
         });
         
-        // Subtle scale breathing effect
+        // Enhanced breathing effect (more apparent)
         this.scene.tweens.add({
             targets: this.sprite,
-            scaleX: this.originalScaleX * 1.02,  // 2% scale change
-            scaleY: this.originalScaleY * 0.98,  // Slight squash
+            scaleX: this.originalScaleX * 1.03,  // Increased from 2% to 3% scale change
+            scaleY: this.originalScaleY * 0.97,  // More noticeable squash
             duration: 1500 + Math.random() * 500,
             ease: 'Sine.easeInOut',
             yoyo: true,
             repeat: -1,
             delay: Math.random() * 500
+        });
+        
+        // Add subtle vertical breathing movement
+        this.scene.tweens.add({
+            targets: this.sprite,
+            y: this.y - 5, // Move up 5px
+            duration: 1800 + Math.random() * 400, // Slightly different timing from scale
+            ease: 'Sine.easeInOut',
+            yoyo: true,
+            repeat: -1,
+            delay: Math.random() * 600 // Different delay pattern
         });
     }
     

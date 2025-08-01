@@ -170,6 +170,11 @@ export default class BattleManager {
             if (this.selectedCards.length > 0) {
                 this.scene.events.emit('handChanged', this.playerHand, this.selectedCards);
             }
+            
+            // Trigger parallax backdrop effect
+            if (this.scene.updateBackdropParallax) {
+                this.scene.updateBackdropParallax(index);
+            }
         }
     }
     
@@ -455,6 +460,11 @@ export default class BattleManager {
             
             // Remove used cards from hand and clear selection
             this.removeSelectedCards();
+        }).catch((error) => {
+            console.error('Special attack error:', error);
+            // Still remove cards even if special attacks fail
+            targetEnemy.takeDamage(finalDamage, { isSpecialAttack: hasSpecialAttacks });
+            this.removeSelectedCards();
         });
     }
     
@@ -615,6 +625,13 @@ export default class BattleManager {
     }
 
     removeSelectedCards() {
+        // Hide the selected card containers before removing from hand
+        this.selectedCards.forEach(index => {
+            if (this.scene.cardContainers && this.scene.cardContainers[index]) {
+                this.scene.cardContainers[index].setVisible(false);
+            }
+        });
+        
         // Remove selected cards from hand (in reverse order to maintain indices)
         this.selectedCards.sort((a, b) => b - a);
         this.selectedCards.forEach(index => {
@@ -801,6 +818,7 @@ export default class BattleManager {
             this.scene.events.emit('handChanged', this.playerHand, this.selectedCards);
         }
     }
+    
     
     endPlayerTurn() {
         this.isPlayerTurn = false;
@@ -1006,8 +1024,36 @@ export default class BattleManager {
         
         // Always draw cards to fill hand back to 8 at start of turn
         if (this.playerHand.length < 8) {
+            // For the very first hand of battle, use drawNewHand to get joker
+            if (this.isFirstHandOfBattle) {
+                this.drawNewHand(true);
+                return; // drawNewHand handles everything including hand display
+            }
+            
+            // Draw only the cards needed to fill to 8, preserving existing cards
+            const cardsNeeded = 8 - this.playerHand.length;
+            const newCards = [];
+            for (let i = 0; i < cardsNeeded; i++) {
+                const newCard = this.scene.playerDeck.drawSingleCard();
+                if (newCard) {
+                    const cardCopy = new Card(newCard.rank, newCard.suit, newCard.value, newCard.rarity);
+                    if (newCard.modifiers) {
+                        newCard.modifiers.forEach(mod => {
+                            cardCopy.addModifier({ ...mod });
+                        });
+                    }
+                    newCards.push(cardCopy);
+                    this.playerHand.push(cardCopy);
+                }
+            }
+            
+            this.sortHand();
+            this.selectedCards = [];
+            
             // Always animate when drawing cards at start of turn
-            this.drawNewHand(true);
+            if (newCards.length > 0) {
+                this.scene.updateHandDisplay(this.playerHand, this.selectedCards, true, newCards);
+            }
         }
     }
     
@@ -1052,8 +1098,6 @@ export default class BattleManager {
         console.log('All enemies status:', this.enemies.map(e => ({ name: e.name, isAlive: e.isAlive, health: e.currentHealth })));
         console.log('Call stack:', new Error().stack);
         
-        // Clear damage preview from all enemies first
-        this.enemies.forEach(e => e.hideDamagePreview());
         
         // Check if all enemies are dead (but only if we actually have enemies)
         const aliveEnemies = this.getAliveEnemies();
@@ -1075,9 +1119,6 @@ export default class BattleManager {
                 const nextTarget = aliveEnemies[0];
                 const nextIndex = this.enemies.indexOf(nextTarget);
                 this.selectEnemy(nextIndex);
-                
-                // Clear hand preview and hero activation indicator when target dies
-                this.scene.events.emit('handChanged', this.playerHand, []);
             }
         }
     }
@@ -1117,7 +1158,7 @@ export default class BattleManager {
             return;
         }
         
-        // Show CSS glassmorphism victory overlay
+        // Show CSS victory overlay
         const victoryOverlay = document.getElementById('victory-overlay');
         const victoryGoldElement = document.getElementById('victory-gold');
         const victoryPanel = victoryOverlay.querySelector('.glass-panel');
@@ -1268,7 +1309,7 @@ export default class BattleManager {
         // Disable player input during game over screen
         this.isPlayerTurn = false;
         
-        // Show CSS glassmorphism defeat overlay
+        // Show CSS defeat overlay
         const defeatOverlay = document.getElementById('defeat-overlay');
         const defeatPanel = defeatOverlay.querySelector('.glass-panel');
         

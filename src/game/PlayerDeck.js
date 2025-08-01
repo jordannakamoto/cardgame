@@ -45,6 +45,8 @@ export default class PlayerDeck {
         
         this.starterDeck.push(jokerCard);
         this.cards = [...this.starterDeck];
+        console.log('Added joker card to deck. Total cards:', this.cards.length);
+        console.log('Joker card:', jokerCard.toString());
         this.saveDeck();
     }
 
@@ -101,11 +103,19 @@ export default class PlayerDeck {
 
     // Draw cards for battle (includes special handling for modifiers)
     drawHand(handSize = 8, isFirstHand = false) {
+        console.log('Drawing hand. handSize:', handSize, 'isFirstHand:', isFirstHand);
+        console.log('Total cards in deck:', this.cards.length);
+        
         // Only include special "first hand" cards if this is actually the first hand
         const specialCards = isFirstHand ? 
             this.cards.filter(card => card.hasModifier('ALWAYS_IN_FIRST_HAND')) : 
             [];
         const regularCards = this.cards.filter(card => !card.hasModifier('ALWAYS_IN_FIRST_HAND'));
+        
+        console.log('Special cards (jokers):', specialCards.length);
+        if (specialCards.length > 0) {
+            console.log('Joker cards found:', specialCards.map(c => c.toString()));
+        }
         
         // Shuffle regular cards
         const shuffledRegular = this.shuffleArray([...regularCards]);
