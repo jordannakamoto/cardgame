@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { EnemyTypes } from '../battle/EnemyTypes.js';
+import OutlinePipeline from '../rendering/OutlinePipeline.js';
 
 export default class PreloadScene extends Phaser.Scene {
     constructor() {
@@ -32,7 +33,7 @@ export default class PreloadScene extends Phaser.Scene {
         this.load.image('pack_basic1', 'packs/basic1.png');
 
         // Load battle backdrop
-        this.load.image('battle-backdrop', 'battle/backdrop7.png');
+        this.load.image('battle-backdrop', 'battle/backdrop10.png');
 
         this.createLoadingBar();
     }
@@ -71,6 +72,9 @@ export default class PreloadScene extends Phaser.Scene {
     }
 
     create() {
+        // Register the outline pipeline
+        this.renderer.pipelines.addPostPipeline('OutlinePipeline', OutlinePipeline);
+        
         this.scene.start('GameScene');
     }
 }
