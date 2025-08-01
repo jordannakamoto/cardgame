@@ -1,5 +1,6 @@
 import Hero, { Ability, HandTypeTrigger, MultiplierEffect } from '../Hero.js';
 import { cardTraitRegistry } from '../../game/CardTraitRegistry.js';
+import ManaStrike from '../../abilities/ManaStrike.js';
 
 export default class StarterHero extends Hero {
     constructor() {
@@ -11,6 +12,9 @@ export default class StarterHero extends Hero {
             maxMana: 50,
             portraitKey: 'warrior2'
         });
+        
+        // Initialize active abilities array
+        this.activeAbilities = [];
     }
 
     setupAbilities() {
@@ -27,6 +31,12 @@ export default class StarterHero extends Hero {
         });
 
         this.addAbility(pairBonus);
+        
+        // Clear and add active abilities
+        this.activeAbilities = [];
+        this.activeAbilities.push(new ManaStrike());
+        
+        console.log(`${this.name} setupAbilities: ${this.activeAbilities.length} active abilities`);
         
         // Register chain trait for joker cards
         this.registerCardTraits();

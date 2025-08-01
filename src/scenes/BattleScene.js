@@ -14,6 +14,7 @@ import { MysticalEffects } from '../effects/MysticalEffects.js';
 import { cardTraitRegistry } from '../game/CardTraitRegistry.js';
 import { PerspectiveConfig } from '../config/PerspectiveConfig.js';
 import ManaSystem from '../battle/ManaSystem.js';
+import AbilityManager from '../battle/AbilityManager.js';
 
 export default class BattleScene extends Phaser.Scene {
     constructor() {
@@ -72,6 +73,9 @@ export default class BattleScene extends Phaser.Scene {
 
         this.heroManager = new HeroManager(this);
 
+        // Create ability manager after hero manager is ready
+        this.abilityManager = new AbilityManager(this, this.heroManager, this.manaSystem);
+
         // Sync heroes from party manager to hero manager
         const partyHeroes = this.partyManager.getAllHeroes();
         console.log('Syncing heroes from PartyManager to HeroManager:', partyHeroes.length, partyHeroes.map(h => h.name));
@@ -79,6 +83,11 @@ export default class BattleScene extends Phaser.Scene {
             const success = this.heroManager.addHero(hero);
             console.log(`Added ${hero.name} to HeroManager:`, success);
         });
+
+        // Refresh ability display after heroes are synced
+        if (this.abilityManager) {
+            this.abilityManager.refreshAbilities();
+        }
 
         // Initialize CardManager for visual rendering only
         this.cardManager.createDeck(); // Keep for compatibility with card rendering methods
@@ -1539,6 +1548,11 @@ Hover over cards for preview`;
         // Clean up mana system
         if (this.manaSystem) {
             this.manaSystem.destroy();
+        }
+
+        // Clean up ability manager
+        if (this.abilityManager) {
+            this.abilityManager.destroy();
         }
 
         console.log('BattleScene shutdown complete');

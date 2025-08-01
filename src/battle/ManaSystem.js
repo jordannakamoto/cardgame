@@ -122,6 +122,9 @@ export default class ManaSystem {
         // Update display
         this.updateManaDisplay(suit);
         
+        // Emit mana changed event
+        this.scene.events.emit('manaChanged');
+        
         // Animate mana gain if amount increased
         if (this.mana[suit] > oldAmount) {
             this.animateManaGain(suit);
@@ -134,6 +137,7 @@ export default class ManaSystem {
         if (this.mana[suit] >= amount) {
             this.mana[suit] -= amount;
             this.updateManaDisplay(suit);
+            this.scene.events.emit('manaChanged');
             this.animateManaSpend(suit);
             return true;
         }

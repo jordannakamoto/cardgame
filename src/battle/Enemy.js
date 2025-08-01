@@ -603,11 +603,18 @@ export default class Enemy {
         }
 
         this.sprite.on('pointerdown', () => {
-            if (this.isAlive && this.scene.battleManager) {
-                // Find this enemy's index in the battle manager's enemy array
-                const enemyIndex = this.scene.battleManager.enemies.indexOf(this);
-                if (enemyIndex !== -1) {
-                    this.scene.battleManager.selectEnemy(enemyIndex);
+            if (this.isAlive) {
+                // Check if ability manager is in targeting mode
+                if (this.scene.abilityManager && this.scene.abilityManager.handleEnemyClick(this)) {
+                    return; // Ability targeting handled the click
+                }
+                
+                // Normal targeting for battle manager
+                if (this.scene.battleManager) {
+                    const enemyIndex = this.scene.battleManager.enemies.indexOf(this);
+                    if (enemyIndex !== -1) {
+                        this.scene.battleManager.selectEnemy(enemyIndex);
+                    }
                 }
             }
         });
