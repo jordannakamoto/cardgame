@@ -41,12 +41,28 @@ export default class ManaSystem {
         this.manaContainer.setDepth(1000); // High depth to stay on top
         this.manaContainer.setScrollFactor(0); // Keep fixed to camera
         
-        // Background panel for mana display
+        // Background panel for mana display - gradient from black to transparent
         const panelWidth = manaConfig.width;
         const panelHeight = manaConfig.height;
-        const panelBg = this.scene.add.rectangle(0, 0, panelWidth, panelHeight, 0x000000, 0.6);
-        panelBg.setStrokeStyle(2, 0x444444);
-        this.manaContainer.add(panelBg);
+        
+        // Create gradient background using graphics
+        const gradientBg = this.scene.add.graphics();
+        
+        // Create gradient effect with multiple rectangles
+        const gradientSteps = 20;
+        const stepWidth = panelWidth / gradientSteps;
+        
+        for (let i = 0; i < gradientSteps; i++) {
+            // Reverse gradient direction based on panel position
+            const alphaIndex = isRightSide ? (gradientSteps - 1 - i) : i;
+            const alpha = 0.6 * (1 - (alphaIndex / gradientSteps)); // Fade from 0.6 to 0
+            const xPos = -panelWidth/2 + (i * stepWidth);
+            
+            gradientBg.fillStyle(0x000000, alpha);
+            gradientBg.fillRect(xPos, -panelHeight/2, stepWidth + 1, panelHeight); // +1 to avoid gaps
+        }
+        
+        this.manaContainer.add(gradientBg);
         
         // Remove title text as requested
         

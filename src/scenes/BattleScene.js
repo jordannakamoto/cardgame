@@ -274,13 +274,23 @@ export default class BattleScene extends Phaser.Scene {
         const screenWidth = this.cameras.main.width;
         const screenHeight = this.cameras.main.height;
 
-        // Create panel container positioned in bottom left corner
-        this.damagePanelContainer = this.add.container(90, screenHeight - 90); // Bottom left corner
+        // Get panel configuration
+        const handConfig = UIConfig.panels.handPreview;
+        const isRightSide = handConfig.position === 'right';
+        
+        // Calculate X position based on side preference
+        const xPos = isRightSide ? 
+            screenWidth - handConfig.offsetX : 
+            handConfig.offsetX;
+        const yPos = screenHeight - handConfig.offsetY;
+
+        // Create panel container
+        this.damagePanelContainer = this.add.container(xPos, yPos);
         this.damagePanelContainer.setScrollFactor(0); // Keep fixed to camera
 
         // Panel background
-        const panelWidth = 350;
-        const panelHeight = 80;
+        const panelWidth = handConfig.width;
+        const panelHeight = handConfig.height;
         const panelBg = this.add.graphics();
         panelBg.fillStyle(0x2a2a2a, 0.9);
         panelBg.fillRoundedRect(0, 0, panelWidth, panelHeight, 12);
