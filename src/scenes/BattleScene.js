@@ -13,6 +13,7 @@ import { setCardTheme, getCurrentTheme, getAvailableThemes } from '../config/Car
 import { MysticalEffects } from '../effects/MysticalEffects.js';
 import { cardTraitRegistry } from '../game/CardTraitRegistry.js';
 import { PerspectiveConfig } from '../config/PerspectiveConfig.js';
+import ManaSystem from '../battle/ManaSystem.js';
 
 export default class BattleScene extends Phaser.Scene {
     constructor() {
@@ -56,6 +57,7 @@ export default class BattleScene extends Phaser.Scene {
         this.cardManager = new CardManager(this);
         this.playerDeck = new PlayerDeck();
         this.battleManager = new BattleManager(this);
+        this.manaSystem = new ManaSystem(this);
         if (!this.inventory) {
             this.inventory = new Inventory();
         }
@@ -575,13 +577,10 @@ Hover over cards for preview`;
                 cardData.artwork.y -= cardHeight/2;
             }
 
-            // Add selection shadow
+            // Add soft selection shadow (add it first so it renders behind the card)
             if (isSelected) {
-                const shadow = this.add.graphics();
-                shadow.fillStyle(0x000000, 0.4);
-                shadow.fillEllipse(0, cardHeight/2 + 15, cardWidth * 0.8, 20); // Shadow beneath card
-                shadow.setDepth(-1); // Behind the card
-                cardContainer.add(shadow);
+                const softShadow = this.createSoftCardShadow(cardWidth, cardHeight);
+                cardContainer.addAt(softShadow, 0); // Add at index 0 to render behind other elements
 
                 // Add mystical effect for joker cards
                 const card = cards[index];
@@ -700,10 +699,18 @@ Hover over cards for preview`;
 
             // Only update if selection state actually changed
             if (isSelected !== wasSelected) {
-                // Remove old selection shadow
+                // Remove old selection shadow with fade-out
                 const existingShadow = cardContainer.list.find(child => child.isShadow);
                 if (existingShadow) {
-                    existingShadow.destroy();
+                    this.tweens.add({
+                        targets: existingShadow,
+                        alpha: 0,
+                        duration: 150,
+                        ease: 'Power2',
+                        onComplete: () => {
+                            if (existingShadow.active) existingShadow.destroy();
+                        }
+                    });
                 }
 
                 // Clean up old mystical effect
@@ -723,15 +730,11 @@ Hover over cards for preview`;
                 }
 
                 if (isSelected) {
-                    // Add selection shadow
+                    // Add soft selection shadow (add it first so it renders behind the card)
                     const cardWidth = UIConfig.card.width;
                     const cardHeight = UIConfig.card.height;
-                    const shadow = this.add.graphics();
-                    shadow.fillStyle(0x000000, 0.4);
-                    shadow.fillEllipse(0, cardHeight/2 + 15, cardWidth * 0.8, 20); // Shadow beneath card
-                    shadow.setDepth(-1); // Behind the card
-                    shadow.isShadow = true; // Mark for identification
-                    cardContainer.add(shadow);
+                    const softShadow = this.createSoftCardShadow(cardWidth, cardHeight);
+                    cardContainer.addAt(softShadow, 0); // Add at index 0 to render behind other elements
 
                     // Add mystical effect for joker cards
                     if (card && card.rank === 'Joker' && card.suit === 'Wild') {
@@ -1407,6 +1410,55 @@ Hover over cards for preview`;
         }
     }
 
+    // Create soft, card-shaped shadow for selected cards with blur and fade
+    createSoftCardShadow(cardWidth, cardHeight) {
+        const shadowContainer = this.add.container(0, 0);
+        shadowContainer.setDepth(-1); // Behind the card
+        shadowContainer.setAlpha(0); // Start invisible for fade-in
+        
+        // Create more shadow layers for better blur effect (reduced opacity by half)
+        const shadowLayers = [
+            { alpha: 0.2, scale: 0.92, offsetX: 3, offsetY: 6 },    // Sharp core shadow
+            { alpha: 0.15, scale: 0.96, offsetX: 4, offsetY: 8 },   // Close blur
+            { alpha: 0.1, scale: 1.02, offsetX: 6, offsetY: 12 },   // Medium blur
+            { alpha: 0.075, scale: 1.08, offsetX: 8, offsetY: 16 }, // Soft blur
+            { alpha: 0.04, scale: 1.15, offsetX: 10, offsetY: 20 }, // Very soft blur
+            { alpha: 0.02, scale: 1.25, offsetX: 12, offsetY: 24 }  // Ultra soft blur
+        ];
+        
+        shadowLayers.forEach(layer => {
+            // Create card-shaped shadow (rounded rectangle)
+            const shadow = this.add.graphics();
+            shadow.fillStyle(0x000000, layer.alpha);
+            
+            // Draw rounded rectangle shadow that resembles card shape
+            const shadowWidth = cardWidth * layer.scale;
+            const shadowHeight = cardHeight * layer.scale;
+            const cornerRadius = 8 * layer.scale; // Rounded corners like a card
+            
+            shadow.fillRoundedRect(
+                -shadowWidth/2 + layer.offsetX, 
+                -shadowHeight/2 + layer.offsetY, 
+                shadowWidth, 
+                shadowHeight, 
+                cornerRadius
+            );
+            
+            shadowContainer.add(shadow);
+        });
+        
+        // Fade in animation
+        this.tweens.add({
+            targets: shadowContainer,
+            alpha: 1,
+            duration: 200,
+            ease: 'Power2'
+        });
+        
+        shadowContainer.isShadow = true; // Mark for identification
+        return shadowContainer;
+    }
+
     // Perspective skew effect - distort background based on viewing angle
     updateBackdropParallax(enemyIndex) {
         if (!this.backdrop || !this.battleManager.enemies || this.battleManager.enemies.length === 0) {
@@ -1482,6 +1534,11 @@ Hover over cards for preview`;
                     hero.cleanup();
                 }
             });
+        }
+
+        // Clean up mana system
+        if (this.manaSystem) {
+            this.manaSystem.destroy();
         }
 
         console.log('BattleScene shutdown complete');
