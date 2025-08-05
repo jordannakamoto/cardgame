@@ -1,4 +1,6 @@
 // Persistent sticky notes system with dark mode styling
+import DebugSystem from '../debug/DebugSystem.js';
+
 export class StickyNote {
     static notes = new Map();
     static nextId = 1;
@@ -19,6 +21,12 @@ export class StickyNote {
         
         this.create();
         StickyNote.notes.set(this.id, this);
+        
+        // Register with debug system
+        DebugSystem.registerDebugElement(`stickyNote_${this.id}`, this.element, {
+            category: 'sticky-notes',
+            description: `Sticky note ${this.id}`
+        });
     }
     
     create() {
@@ -378,6 +386,9 @@ export class StickyNote {
         document.removeEventListener('mousemove', this.handleResize);
         document.removeEventListener('mouseup', this.handleResizeEnd);
         
+        // Unregister from debug system
+        DebugSystem.unregisterDebugElement(`stickyNote_${this.id}`);
+        
         this.element.remove();
         StickyNote.notes.delete(this.id);
         
@@ -406,7 +417,12 @@ export class StickyNote {
         try {
             const notes = JSON.parse(localStorage.getItem('stickyNotes') || '[]');
             notes.forEach(noteData => {
-                new StickyNote(noteData);
+                const note = new StickyNote(noteData);
+                
+                // Check if we're in presentation mode and hide if needed
+                if (DebugSystem.isPresentationMode && note.element) {
+                    note.element.style.display = 'none';
+                }
             });
             
             // Update nextId to avoid conflicts

@@ -29,6 +29,15 @@ export class ContextMenu {
         
         document.body.appendChild(this.menuElement);
         
+        // Register with debug system
+        import('../debug/DebugSystem.js').then(module => {
+            const DebugSystem = module.default;
+            DebugSystem.registerDebugElement('contextMenu', this.menuElement, {
+                category: 'ui',
+                description: 'Right-click context menu'
+            });
+        });
+        
         // Set up event listeners
         this.setupEventListeners();
         
@@ -101,6 +110,11 @@ export class ContextMenu {
     }
     
     show(x, y) {
+        // Don't show context menu in presentation mode
+        if (window.DebugSystem && window.DebugSystem.isPresentationMode) {
+            return;
+        }
+        
         this.render();
         this.menuElement.style.display = 'block';
         this.isVisible = true;

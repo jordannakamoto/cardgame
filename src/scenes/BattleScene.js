@@ -16,6 +16,8 @@ import { PerspectiveConfig } from '../config/PerspectiveConfig.js';
 import ManaSystem from '../battle/ManaSystem.js';
 import AbilityManager from '../battle/AbilityManager.js';
 import HandPreviewPanel from '../ui/HandPreviewPanel.js';
+import DebugSystem from '../debug/DebugSystem.js';
+import SVGIconManager from '../ui/SVGIconManager.js';
 
 export default class BattleScene extends Phaser.Scene {
     constructor() {
@@ -147,6 +149,12 @@ export default class BattleScene extends Phaser.Scene {
         this.infoButton.on('pointerdown', () => this.toggleInfoMenu());
         this.infoButton.on('pointerover', () => this.infoButton.setTint(0xffffff));
         this.infoButton.on('pointerout', () => this.infoButton.clearTint());
+        
+        // Register info button as debug element
+        DebugSystem.registerDebugElement('infoButton', this.infoButton, {
+            category: 'controls',
+            description: 'Information panel toggle button'
+        });
 
         // Info menu (initially hidden)
         this.infoMenu = this.add.container(screenWidth / 2, screenHeight / 2);
@@ -154,6 +162,13 @@ export default class BattleScene extends Phaser.Scene {
         this.createInfoMenu();
         this.infoMenu.setVisible(false);
         this.infoMenuVisible = false;
+        
+        // Register info menu as debug element
+        DebugSystem.registerDebugElement('infoMenu', this.infoMenu, {
+            category: 'overlays',
+            description: 'Information overlay panel (sticky notes)',
+            toggleable: true
+        });
 
         // Hand cards display area at bottom
         this.handCardsContainer = this.add.container(screenWidth / 2, screenHeight - 140);  // Cards back at bottom
@@ -169,23 +184,8 @@ export default class BattleScene extends Phaser.Scene {
         // Make accessible globally for console commands
         window.handPreviewPanel = this.handPreviewPanel;
 
-        // Gold display with symbol
-        this.goldDisplay = this.add.text(
-            90,                     // 60 * 1.5
-            90,                     // 60 * 1.5
-            '🪙 0',
-            {
-                fontSize: '54px',   // 36 * 1.5
-                color: '#ffdd00',
-                fontFamily: 'Arial',
-                fontStyle: 'bold'
-            }
-        );
-        this.goldDisplay.setOrigin(0, 0.5);
-        this.goldDisplay.setScrollFactor(0); // Keep fixed to camera
-
-        // Update gold display with current inventory amount
-        this.updateGoldDisplay();
+        // Modern gold display with SVG token icon
+        this.createGoldDisplay();
 
         // Hero display (removed - now shown in portraits)
         // this.heroDisplay = this.add.text(
@@ -233,6 +233,13 @@ export default class BattleScene extends Phaser.Scene {
         this.sortButton.on('pointerdown', () => this.battleManager.toggleSortMode());
         this.sortButton.on('pointerover', () => this.sortButton.setTint(0xdddddd));
         this.sortButton.on('pointerout', () => this.sortButton.clearTint());
+        
+        // Register sort button as debug element (keep visible in presentation mode)
+        DebugSystem.registerDebugElement('sortButton', this.sortButton, {
+            category: 'controls',
+            description: 'Card sorting toggle button',
+            toggleable: false  // Keep visible in presentation mode
+        });
 
         // Discard counter
         this.discardCounter = this.add.text(
@@ -249,6 +256,13 @@ export default class BattleScene extends Phaser.Scene {
         );
         this.discardCounter.setOrigin(0.5);
         this.discardCounter.setScrollFactor(0); // Keep fixed to camera
+        
+        // Register discard counter as debug element (keep visible in presentation mode)
+        DebugSystem.registerDebugElement('discardCounter', this.discardCounter, {
+            category: 'stats',
+            description: 'Discard counter display',
+            toggleable: false  // Keep visible in presentation mode
+        });
 
 
         this.updateHeroDisplay();
@@ -312,6 +326,11 @@ export default class BattleScene extends Phaser.Scene {
         this.input.keyboard.on('keydown-S', () => {
             this.battleManager.toggleSortMode();
         });
+        
+        // Set up debug system and presentation mode
+        DebugSystem.setupKeyboardShortcut(this);
+        
+        // Debug info panel removed for cleaner interface
     }
 
     // Initialize card traits for this battle session
@@ -1053,9 +1072,80 @@ Hover over cards for preview`;
         this.updateGoldDisplay();
     }
 
+    createGoldDisplay() {
+        // Create simple, minimal gold display
+        const container = this.add.container(100, 80);
+        
+        // Clean background - subtle dark rect, larger size
+        const bg = this.add.graphics();
+        bg.fillStyle(0x000000, 0.3);
+        bg.fillRoundedRect(-60, -25, 120, 50, 10);
+        
+        // Gold text (will be replaced with icon + text when loaded)
+        this.goldText = this.add.text(0, 0, '🪙 0', {
+            fontSize: '32px',
+            color: '#ffffff',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif'
+        });
+        this.goldText.setOrigin(0.5);
+        
+        container.add([bg, this.goldText]);
+        container.setScrollFactor(0);
+        
+        this.goldDisplay = container;
+        
+        // Load SVG icon and update display when ready
+        this.loadGoldIcon();
+        
+        // Update display
+        this.updateGoldDisplay();
+    }
+    
+    async loadGoldIcon() {
+        try {
+            await SVGIconManager.loadSVGAsTexture(this, 'TOKEN', 'icon-token-white', { 
+                size: 28, 
+                color: '#ffffff' 
+            });
+            
+            // Replace emoji text with icon + text
+            this.goldText.destroy();
+            this.goldIconText = SVGIconManager.createIconText(
+                this,
+                0, 0,
+                'icon-token-white',
+                this.inventory.getResource('gold').toString(),
+                {
+                    iconScale: 1,
+                    textStyle: {
+                        fontSize: '32px',
+                        color: '#ffffff',
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif'
+                    },
+                    spacing: 12
+                }
+            );
+            
+            this.goldDisplay.add(this.goldIconText);
+            
+        } catch (error) {
+            console.warn('Failed to load gold icon, keeping emoji fallback:', error);
+        }
+    }
+
     updateGoldDisplay() {
         const gold = this.inventory.getResource('gold');
-        this.goldDisplay.setText(`🪙 ${gold}`);
+        
+        if (this.goldIconText) {
+            // Update the text in the icon+text container
+            const textObj = this.goldIconText.list[1]; // Second child is the text
+            if (textObj) {
+                textObj.setText(gold.toString());
+            }
+        } else if (this.goldText) {
+            // Fallback to emoji version
+            this.goldText.setText(`🪙 ${gold}`);
+        }
     }
 
     updateHeroDisplay() {
@@ -1234,7 +1324,7 @@ Hover over cards for preview`;
             portraitBg.lineStyle(isActive ? 3 : 2, isActive ? 0x888888 : 0x666666);
             portraitBg.strokeRoundedRect(-portraitWidth/2, -portraitHeight/2, portraitWidth, portraitHeight, 8);
 
-            // Hero portrait image with cropping
+            // Hero portrait image/video with cropping
             let heroImage = null;
             if (hero.portraitKey && this.textures.exists(hero.portraitKey)) {
                 heroImage = this.add.image(0, 0, hero.portraitKey);
@@ -1255,7 +1345,9 @@ Hover over cards for preview`;
                 // Crop to show only the top portion
                 const cropHeight = Math.min(textureHeight, textureHeight * (portraitHeight - 8) / scaledHeight);
                 heroImage.setCrop(0, 0, textureWidth, cropHeight);
-            } else {
+            }
+            
+            if (!heroImage) {
                 // Fallback colored rectangle
                 const fallbackColor = hero.type === 'damage' ? 0xff6666 :
                                     hero.type === 'support' ? 0x66ff66 : 0x6666ff;

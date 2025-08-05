@@ -13,10 +13,15 @@
     "test:manager": "node test/card-engine/cardManagerTests.js",
     "test:inventory": "node test/inventoryTests.js"
   },
-  "keywords": ["phaser", "card", "game"],
+  "keywords": [
+    "phaser",
+    "card",
+    "game"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.0.0",
     "phaser": "^3.70.0"
   },
   "devDependencies": {

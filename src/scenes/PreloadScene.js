@@ -71,9 +71,10 @@ export default class PreloadScene extends Phaser.Scene {
         });
     }
 
-    create() {
+    async create() {
         // Register the outline pipeline
         this.renderer.pipelines.addPostPipeline('OutlinePipeline', OutlinePipeline);
+        
         
         this.scene.start('GameScene');
     }

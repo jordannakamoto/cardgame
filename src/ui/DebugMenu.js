@@ -1,4 +1,5 @@
 import ModeManager, { GameModes } from '../managers/ModeManager.js';
+import DebugSystem from '../debug/DebugSystem.js';
 
 export class DebugMenu {
     constructor() {
@@ -11,6 +12,16 @@ export class DebugMenu {
         const shopBtn = document.getElementById('shop-mode');
         const eventBtn = document.getElementById('event-mode');
         const partyBtn = document.getElementById('party-mode');
+        const presentationBtn = document.getElementById('presentation-mode');
+        
+        // Register debug menu elements with the debug system
+        const debugMenuBar = document.querySelector('#debug-menu');
+        if (debugMenuBar) {
+            DebugSystem.registerDebugElement('debugMenuBar', debugMenuBar, {
+                category: 'navigation',
+                description: 'Main debug navigation bar'
+            });
+        }
 
         battleBtn.addEventListener('click', () => {
             this.setMode(GameModes.BATTLE);
@@ -23,6 +34,12 @@ export class DebugMenu {
         });
         eventBtn.addEventListener('click', () => this.setMode(GameModes.EVENT));
         partyBtn.addEventListener('click', () => this.setMode(GameModes.PARTY));
+        
+        // Presentation mode button
+        presentationBtn.addEventListener('click', () => {
+            const isPresentationMode = DebugSystem.togglePresentationMode();
+            this.updatePresentationButton(isPresentationMode);
+        });
 
         // Debug actions dropdown
         this.setupDebugActions();
@@ -47,6 +64,19 @@ export class DebugMenu {
             document.getElementById('event-mode').classList.add('active');
         } else if (activeMode === GameModes.PARTY) {
             document.getElementById('party-mode').classList.add('active');
+        }
+    }
+    
+    updatePresentationButton(isPresentationMode) {
+        const presentationBtn = document.getElementById('presentation-mode');
+        if (presentationBtn) {
+            if (isPresentationMode) {
+                presentationBtn.classList.add('presentation');
+                presentationBtn.textContent = '🎥 Exit Presentation';
+            } else {
+                presentationBtn.classList.remove('presentation');
+                presentationBtn.textContent = '🎥 Presentation Mode';
+            }
         }
     }
 
