@@ -6,6 +6,7 @@ import { packManager } from '../packs/PackManager.js';
 import { EquipmentRegistry } from '../equipment/EquipmentRegistry.js';
 import { Equipment } from '../equipment/Equipment.js';
 import { EquipmentMenu } from '../ui/EquipmentMenu.js';
+import { SVGIconManager } from '../ui/SVGIconManager.js';
 
 // Import the custom pipeline
 import FoilPipeline from '../rendering/FoilPipeline.js';
@@ -61,25 +62,31 @@ export default class ShopScene extends Phaser.Scene {
         this.equipmentMenu = new EquipmentMenu(this);
     }
 
-    create() {
+    async create() {
         const screenWidth = this.cameras.main.width;
         const screenHeight = this.cameras.main.height;
+
+        // Load the token icon first
+        await SVGIconManager.loadSVGAsTexture(this, 'TOKEN', 'token-icon', {
+            size: 32,
+            color: '#ffffff'
+        });
 
         // Rich gradient background like Balatro
         this.createBackground();
 
-        // Shop title with ornate styling
+        // Modern shop title
         this.titleText = this.add.text(
             screenWidth / 2,
             120,
-            'MERCHANT\'S SANCTUM',
+            'SHOP',
             {
-                fontSize: '84px',
-                color: '#d4af37',
+                fontSize: '72px',
+                color: '#ffffff',
                 fontFamily: 'Arial',
-                fontStyle: 'bold',
-                stroke: '#8b4513',
-                strokeThickness: 4
+                fontWeight: '300',
+                stroke: '#000000',
+                strokeThickness: 2
             }
         );
         this.titleText.setOrigin(0.5);
@@ -123,63 +130,48 @@ export default class ShopScene extends Phaser.Scene {
         const screenWidth = this.cameras.main.width;
         const screenHeight = this.cameras.main.height;
 
-        // Rich gradient background
+        // Modern dark background
         const bg = this.add.graphics();
-        bg.fillGradientStyle(0x2a1810, 0x2a1810, 0x1a0f08, 0x1a0f08, 1);
+        bg.fillStyle(0x0a0a0a, 1); // Very dark background
         bg.fillRect(0, 0, screenWidth, screenHeight);
 
-        // Add subtle texture with multiple overlays
-        const overlay1 = this.add.graphics();
-        overlay1.fillStyle(0x3a2820, 0.3);
-        overlay1.fillRect(0, 0, screenWidth, screenHeight);
+        // Subtle dark gradient overlay
+        const overlay = this.add.graphics();
+        overlay.fillGradientStyle(0x1a1a1a, 0x1a1a1a, 0x0a0a0a, 0x0a0a0a, 0.6);
+        overlay.fillRect(0, 0, screenWidth, screenHeight);
 
-        // Add ornate border
+        // Clean angular border
         const border = this.add.graphics();
-        border.lineStyle(8, 0xd4af37, 0.6);
-        border.strokeRoundedRect(20, 20, screenWidth - 40, screenHeight - 40, 20);
-
-        border.lineStyle(4, 0x8b4513, 0.4);
-        border.strokeRoundedRect(30, 30, screenWidth - 60, screenHeight - 60, 15);
+        border.lineStyle(2, 0x333333, 0.8);
+        border.strokeRect(40, 40, screenWidth - 80, screenHeight - 80);
     }
 
     createGoldDisplay() {
         const screenWidth = this.cameras.main.width;
 
-        // Ornate gold frame
+        // Modern angular frame
         const goldFrame = this.add.graphics();
-        goldFrame.fillStyle(0x8b4513, 0.8);
-        goldFrame.fillRoundedRect(80, 60, 280, 80, 12);
-        goldFrame.lineStyle(4, 0xd4af37, 1.0);
-        goldFrame.strokeRoundedRect(80, 60, 280, 80, 12);
-
-        // Inner glow
-        goldFrame.lineStyle(2, 0xffd700, 0.6);
-        goldFrame.strokeRoundedRect(86, 66, 268, 68, 9);
+        goldFrame.fillStyle(0x1a1a1a, 0.9);
+        goldFrame.fillRect(80, 60, 280, 80);
+        goldFrame.lineStyle(2, 0x444444, 1.0);
+        goldFrame.strokeRect(80, 60, 280, 80);
 
         this.goldDisplay = this.add.text(
             220,
             100,
             `${this.playerGold}`,
             {
-                fontSize: '48px',
-                color: '#ffd700',
+                fontSize: '42px',
+                color: '#ffffff',
                 fontFamily: 'Arial',
-                fontStyle: 'bold',
-                stroke: '#8b4513',
-                strokeThickness: 3
+                fontWeight: '500'
             }
         );
         this.goldDisplay.setOrigin(0.5);
 
         // Gold coin icon
-        const coinIcon = this.add.text(
-            140,
-            100,
-            '🪙',
-            {
-                fontSize: '36px'
-            }
-        );
+        const coinIcon = this.add.image(140, 100, 'token-icon');
+        coinIcon.setScale(0.8);
         coinIcon.setOrigin(0.5);
     }
 
@@ -245,63 +237,66 @@ export default class ShopScene extends Phaser.Scene {
 
     createShopDisplay() {
         const screenWidth = this.cameras.main.width;
-        const startY = 380;
-        const itemsPerRow = 3;
-        const cardSpacing = 360;
-        const rowSpacing = 480;
-
-        // Create shop title section
-        const shopLabel = this.add.text(
-            screenWidth / 2,
-            220,
-            'AVAILABLE WARES',
-            {
-                fontSize: '42px',
-                color: '#d4af37',
-                fontFamily: 'Arial',
-                fontStyle: 'bold',
-                stroke: '#8b4513',
-                strokeThickness: 2
-            }
-        );
-        shopLabel.setOrigin(0.5);
-
+        const screenHeight = this.cameras.main.height;
         this.itemContainers = [];
 
-        this.shopInventory.forEach((item, index) => {
-            const row = Math.floor(index / itemsPerRow);
-            const col = index % itemsPerRow;
+        // Separate items by category
+        const equipment = this.shopInventory.filter(item => item.category === 'equipment');
+        const cardsAndPacks = this.shopInventory.filter(item => item.category === 'pack' || item.category === 'hero');
 
-            // Calculate position for centered grid layout
-            const totalRowWidth = Math.min(this.shopInventory.length, itemsPerRow) * cardSpacing - cardSpacing;
-            const rowItemCount = Math.min(this.shopInventory.length - row * itemsPerRow, itemsPerRow);
-            const rowWidth = (rowItemCount - 1) * cardSpacing;
-            const startX = (screenWidth - rowWidth) / 2;
-            const itemX = startX + (col * cardSpacing);
-            const itemY = startY + (row * rowSpacing);
+        // Simple centered grid layout
+        const allItems = [...equipment, ...cardsAndPacks];
 
-            const container = this.createShopItem(item, itemX, itemY, index);
-            this.itemContainers.push(container);
-        });
+        // Simple shop items grid - properly distributed
+        if (allItems.length > 0) {
+            const cols = 3;
+            const itemSpacing = 280;
+            const rowSpacing = 380;
+            const totalRows = Math.ceil(allItems.length / cols);
+            
+            // Start position (top-left of grid area) - moved down
+            const gridStartY = 400; // Moved down from 300 to 400
+            const gridCenterX = screenWidth / 2;
+            const gridWidth = (cols - 1) * itemSpacing;
+            const gridStartX = gridCenterX - gridWidth/2;
+            
+            allItems.forEach((item, index) => {
+                const col = index % cols;
+                const row = Math.floor(index / cols);
+                
+                // Simple grid positioning
+                const itemX = gridStartX + (col * itemSpacing);
+                const itemY = gridStartY + (row * rowSpacing);
+                
+                const container = this.createShopItem(item, itemX, itemY, index);
+                this.itemContainers.push(container);
+            });
+        }
     }
+
 
     createShopItem(item, x, y, index) {
         const container = this.add.container(x, y);
         const canAfford = this.playerGold >= item.price;
 
-        // Larger Balatro-style card
-        const cardWidth = 320;
-        const cardHeight = 420;
+        // Standard shop item size
+        const cardWidth = 280;
+        const cardHeight = 360;
         const itemBg = this.add.graphics();
 
-        // Rich card background with gradient - no borders (skip for packs)
+        // Modern angular card background (skip for packs)
         if (item.category !== 'pack') {
             if (canAfford) {
-                itemBg.fillGradientStyle(0x3a2f28, 0x3a2f28, 0x2a1f18, 0x2a1f18, 1);
+                itemBg.fillStyle(0x1a1a1a, 0.9);
+                itemBg.fillRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight);
+                itemBg.lineStyle(2, 0x444444, 0.8);
+                itemBg.strokeRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight);
             } else {
-                itemBg.fillGradientStyle(0x2a1f18, 0x2a1f18, 0x1a0f08, 0x1a0f08, 1);
+                itemBg.fillStyle(0x0f0f0f, 0.7);
+                itemBg.fillRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight);
+                itemBg.lineStyle(1, 0x333333, 0.5);
+                itemBg.strokeRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight);
             }
-            itemBg.fillRoundedRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight, 16);
         }
 
         // Get rarity color for other UI elements
@@ -311,84 +306,49 @@ export default class ShopScene extends Phaser.Scene {
         let priceContainer;
 
         if (item.category === 'pack') {
-            // Special pack price display positioned below the "CARD PACK" label
+            // Angular pack price display
             priceContainer = this.add.container(0, -cardHeight/2 + 75);
             const priceBg = this.add.graphics();
 
-            // Wide pack price banner
-            priceBg.fillGradientStyle(0x000000, 0x000000, 0x333333, 0x333333, 0.9);
-            priceBg.fillRoundedRect(-140, -20, 280, 40, 20);
-            priceBg.lineStyle(4, canAfford ? 0xffd700 : 0x666666, 1.0);
-            priceBg.strokeRoundedRect(-140, -20, 280, 40, 20);
+            // Clean pack price (no background box)
 
             const priceText = this.add.text(20, 0, `${item.price}`, {
-                fontSize: '32px',
-                color: canAfford ? '#ffd700' : '#666666',
+                fontSize: '28px',
+                color: canAfford ? '#ffffff' : '#666666',
                 fontFamily: 'Arial',
-                fontStyle: 'bold',
-                stroke: '#000000',
-                strokeThickness: 2
+                fontWeight: '500'
             });
             priceText.setOrigin(0.5);
 
-            // Larger coin icon for packs
-            const coinIcon = this.add.text(-30, 0, '🪙', {
-                fontSize: '28px'
-            });
+            // Clean coin icon for packs
+            const coinIcon = this.add.image(-30, 0, 'token-icon');
+            coinIcon.setScale(0.6);
             coinIcon.setOrigin(0.5);
 
             priceContainer.add([priceBg, coinIcon, priceText]);
         } else {
-            // Regular item price display
+            // Angular regular item price display
             priceContainer = this.add.container(0, -cardHeight/2 + 35);
             const priceBg = this.add.graphics();
 
-            // Ornate price badge
-            priceBg.fillGradientStyle(0x8b4513, 0x8b4513, 0x654321, 0x654321, 1);
-            priceBg.fillRoundedRect(-60, -20, 120, 40, 20);
-            priceBg.lineStyle(4, canAfford ? 0xd4af37 : 0x666666, 1.0);
-            priceBg.strokeRoundedRect(-60, -20, 120, 40, 20);
-
-            // Inner glow
-            priceBg.lineStyle(2, canAfford ? 0xffd700 : 0x888888, 0.6);
-            priceBg.strokeRoundedRect(-54, -14, 108, 28, 16);
+            // Clean price (no background box)
 
             const priceText = this.add.text(15, 0, `${item.price}`, {
-                fontSize: '32px',
-                color: canAfford ? '#ffd700' : '#666666',
+                fontSize: '28px',
+                color: canAfford ? '#ffffff' : '#666666',
                 fontFamily: 'Arial',
-                fontStyle: 'bold',
-                stroke: '#000000',
-                strokeThickness: 2
+                fontWeight: '500'
             });
             priceText.setOrigin(0.5);
 
-            // Coin icon - larger and more prominent
-            const coinIcon = this.add.text(-30, 0, '🪙', {
-                fontSize: '28px'
-            });
+            // Clean coin icon
+            const coinIcon = this.add.image(-30, 0, 'token-icon');
+            coinIcon.setScale(0.6);
             coinIcon.setOrigin(0.5);
 
             priceContainer.add([priceBg, coinIcon, priceText]);
         }
 
-        // Rarity banner - larger and more elegant
-        if (item.rarity) {
-            const rarityBanner = this.add.graphics();
-            rarityBanner.fillStyle(rarityColor, 0.9);
-            rarityBanner.fillRoundedRect(-cardWidth/2, -cardHeight/2 + 80, cardWidth, 40, 12);
-
-            const rarityText = this.add.text(0, -cardHeight/2 + 100, item.rarity.toUpperCase(), {
-                fontSize: '18px',
-                color: '#ffffff',
-                fontFamily: 'Arial',
-                fontStyle: 'bold',
-                stroke: '#000000',
-                strokeThickness: 2
-            });
-            rarityText.setOrigin(0.5);
-            container.add([rarityBanner, rarityText]);
-        }
 
         // Item visual representation (larger)
         const itemVisual = this.createItemVisual(item, canAfford, cardWidth, cardHeight);
@@ -400,27 +360,24 @@ export default class ShopScene extends Phaser.Scene {
             // For packs, we only show the "CARD PACK" label at top and price at bottom
             // No name or description text needed
         } else {
-            // Regular items get both name and description
+            // Regular items get both name and description - modern styling
             nameText = this.add.text(0, cardHeight/2 - 80, item.name, {
-                fontSize: '24px',
-                color: canAfford ? '#d4af37' : '#666666',
+                fontSize: '22px',
+                color: canAfford ? '#ffffff' : '#666666',
                 fontFamily: 'Arial',
-                fontStyle: 'bold',
+                fontWeight: '600',
                 align: 'center',
-                wordWrap: { width: cardWidth - 30 },
-                stroke: '#000000',
-                strokeThickness: 2
+                wordWrap: { width: cardWidth - 30 }
             });
             nameText.setOrigin(0.5);
 
             descText = this.add.text(0, cardHeight/2 - 35, item.description, {
-                fontSize: '16px',
+                fontSize: '14px',
                 color: canAfford ? '#cccccc' : '#555555',
                 fontFamily: 'Arial',
+                fontWeight: '400',
                 align: 'center',
-                wordWrap: { width: cardWidth - 40 },
-                stroke: '#000000',
-                strokeThickness: 1
+                wordWrap: { width: cardWidth - 40 }
             });
             descText.setOrigin(0.5);
         }
@@ -450,9 +407,9 @@ export default class ShopScene extends Phaser.Scene {
                 container.originalX = container.x;
                 container.originalY = container.y;
 
-                // Special pack hover with 3D tilt effect
+                // Pack hover with 3D tilt effect (no scaling)
                 container.on('pointerover', () => {
-                    container.setScale(1.08);
+                    // No scaling, just 3D tilt continues to work
                 });
                 container.on('pointermove', (pointer) => {
                     // Calculate mouse position relative to container center
@@ -475,19 +432,80 @@ export default class ShopScene extends Phaser.Scene {
                     }
                 });
                 container.on('pointerout', () => {
-                    container.setScale(1.0);
                     const packMesh = this.findPackMesh(container);
                     if (packMesh) {
                         this.resetPackTilt(packMesh);
                     }
                 });
             } else {
-                // Regular item hover
+                // Regular item hover with background color tween
+                container.hoverValue = 0; // Add a hover value to interpolate
+                
                 container.on('pointerover', () => {
-                    container.setScale(1.08);
+                    if (canAfford) {
+                        // Tween hover value from 0 to 1
+                        this.tweens.add({
+                            targets: container,
+                            hoverValue: 1,
+                            duration: 200,
+                            ease: 'Power2',
+                            onUpdate: () => {
+                                const t = container.hoverValue;
+                                // Interpolate colors
+                                const bgColor = Phaser.Display.Color.Interpolate.ColorWithColor(
+                                    Phaser.Display.Color.ValueToColor(0x1a1a1a),
+                                    Phaser.Display.Color.ValueToColor(0x242424),
+                                    1,
+                                    t
+                                );
+                                const borderColor = Phaser.Display.Color.Interpolate.ColorWithColor(
+                                    Phaser.Display.Color.ValueToColor(0x444444),
+                                    Phaser.Display.Color.ValueToColor(0x666666),
+                                    1,
+                                    t
+                                );
+                                
+                                itemBg.clear();
+                                itemBg.fillStyle(Phaser.Display.Color.GetColor(bgColor.r, bgColor.g, bgColor.b), 0.9);
+                                itemBg.fillRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight);
+                                itemBg.lineStyle(2, Phaser.Display.Color.GetColor(borderColor.r, borderColor.g, borderColor.b), 0.8);
+                                itemBg.strokeRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight);
+                            }
+                        });
+                    }
                 });
                 container.on('pointerout', () => {
-                    container.setScale(1.0);
+                    if (canAfford) {
+                        // Tween hover value back to 0
+                        this.tweens.add({
+                            targets: container,
+                            hoverValue: 0,
+                            duration: 200,
+                            ease: 'Power2',
+                            onUpdate: () => {
+                                const t = container.hoverValue;
+                                // Interpolate colors
+                                const bgColor = Phaser.Display.Color.Interpolate.ColorWithColor(
+                                    Phaser.Display.Color.ValueToColor(0x1a1a1a),
+                                    Phaser.Display.Color.ValueToColor(0x242424),
+                                    1,
+                                    t
+                                );
+                                const borderColor = Phaser.Display.Color.Interpolate.ColorWithColor(
+                                    Phaser.Display.Color.ValueToColor(0x444444),
+                                    Phaser.Display.Color.ValueToColor(0x666666),
+                                    1,
+                                    t
+                                );
+                                
+                                itemBg.clear();
+                                itemBg.fillStyle(Phaser.Display.Color.GetColor(bgColor.r, bgColor.g, bgColor.b), 0.9);
+                                itemBg.fillRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight);
+                                itemBg.lineStyle(2, Phaser.Display.Color.GetColor(borderColor.r, borderColor.g, borderColor.b), 0.8);
+                                itemBg.strokeRect(-cardWidth/2, -cardHeight/2, cardWidth, cardHeight);
+                            }
+                        });
+                    }
                 });
             }
         }
@@ -503,9 +521,9 @@ export default class ShopScene extends Phaser.Scene {
             const portraitBg = this.add.graphics();
             const bgColor = canAfford ? 0x444444 : 0x222222;
             portraitBg.fillStyle(bgColor);
-            portraitBg.fillRoundedRect(-90, -65, 180, 130, 16);
+            portraitBg.fillRect(-90, -65, 180, 130);
             portraitBg.lineStyle(4, canAfford ? 0x888888 : 0x444444);
-            portraitBg.strokeRoundedRect(-90, -65, 180, 130, 16);
+            portraitBg.strokeRect(-90, -65, 180, 130);
 
             // Hero type with larger icon
             const typeColor = item.type === 'damage' ? 0xff6666 :
@@ -522,12 +540,12 @@ export default class ShopScene extends Phaser.Scene {
 
             visual.add([portraitBg, typeIcon, symbolText]);
         } else if (item.category === 'pack') {
-            // Create the mesh with texture following the working version
-            // Scaled down mesh size
-            const meshWidth = 1.6;   // 2 * 0.8 = 1.6 units wide
-            const meshHeight = 2.24; // 2.8 * 0.8 = 2.24 units tall
+            // Create the mesh with texture - smaller for grid layout
+            // Further scaled down mesh size to match other grid items
+            const meshWidth = 1.0;   // Reduced from 1.6 to 1.0
+            const meshHeight = 1.4;  // Reduced from 2.24 to 1.4
             
-            const packMesh = this.add.mesh(0, 60, item.artKey);
+            const packMesh = this.add.mesh(0, 30, item.artKey); // Moved up from y:60 to y:30
             const plane = this.createPlaneGeometry(meshWidth, meshHeight, 1, 1);
 
             // Add geometry to mesh following working version
@@ -557,12 +575,12 @@ export default class ShopScene extends Phaser.Scene {
                 packMesh.setTint(0x666666);
             }
 
-            // "CARD PACK" label at the very top
+            // "CARD PACK" label at the very top - adjusted for smaller mesh
             const labelBg = this.add.graphics();
             labelBg.fillStyle(0x000000, 0.8);
-            labelBg.fillRoundedRect(-100, -180, 200, 35, 18);
+            labelBg.fillRect(-80, -140, 160, 30);
 
-            const labelText = this.add.text(0, -162, 'CARD PACK', {
+            const labelText = this.add.text(0, -125, 'CARD PACK', {
                 fontSize: '20px',
                 color: '#ffd700',
                 fontFamily: 'Arial',
@@ -583,18 +601,7 @@ export default class ShopScene extends Phaser.Scene {
     }
 
     createItemIcon(item, canAfford) {
-        const iconBg = this.add.graphics();
-        const rarityColor = item.rarity ? this.getRarityColor(item.rarity) : 0x8b4513;
-
-        // Larger ornate circular background
-        iconBg.fillStyle(canAfford ? 0x3a2f28 : 0x222222);
-        iconBg.fillCircle(0, 0, 65);
-        iconBg.lineStyle(5, canAfford ? rarityColor : 0x444444, canAfford ? 1.0 : 0.5);
-        iconBg.strokeCircle(0, 0, 65);
-
-        // Inner circle for depth
-        iconBg.lineStyle(3, canAfford ? rarityColor : 0x333333, canAfford ? 0.6 : 0.3);
-        iconBg.strokeCircle(0, 0, 55);
+        // No background circle - clean icon only
 
         // Item type specific icons with better visuals
         let iconSymbol = '?';
@@ -626,7 +633,7 @@ export default class ShopScene extends Phaser.Scene {
         });
         iconText.setOrigin(0.5);
 
-        return this.add.container(0, 0, [iconBg, iconText]);
+        return this.add.container(0, 0, [iconText]);
     }
 
     getRarityColor(rarity) {
@@ -847,30 +854,24 @@ export default class ShopScene extends Phaser.Scene {
         const screenWidth = this.cameras.main.width;
         const screenHeight = this.cameras.main.height;
 
-        // Ornate continue button
+        // Angular continue button
         const buttonContainer = this.add.container(screenWidth / 2, screenHeight - 120);
 
         const continueButton = this.add.graphics();
-        continueButton.fillGradientStyle(0x8b4513, 0x8b4513, 0x654321, 0x654321, 1);
-        continueButton.fillRoundedRect(-150, -40, 300, 80, 20);
-        continueButton.lineStyle(4, 0xd4af37, 1.0);
-        continueButton.strokeRoundedRect(-150, -40, 300, 80, 20);
-
-        // Inner glow
-        continueButton.lineStyle(2, 0xffd700, 0.6);
-        continueButton.strokeRoundedRect(-144, -34, 288, 68, 16);
+        continueButton.fillStyle(0x1a1a1a, 0.9);
+        continueButton.fillRect(-150, -40, 300, 80);
+        continueButton.lineStyle(2, 0x666666, 1.0);
+        continueButton.strokeRect(-150, -40, 300, 80);
 
         const continueText = this.add.text(
             0,
             0,
-            'VENTURE FORTH',
+            'CONTINUE',
             {
-                fontSize: '36px',
-                color: '#d4af37',
+                fontSize: '32px',
+                color: '#ffffff',
                 fontFamily: 'Arial',
-                fontStyle: 'bold',
-                stroke: '#8b4513',
-                strokeThickness: 2
+                fontWeight: '500'
             }
         );
         continueText.setOrigin(0.5);
@@ -882,12 +883,20 @@ export default class ShopScene extends Phaser.Scene {
         buttonContainer.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
         buttonContainer.on('pointerdown', () => this.continueToNextBattle());
         buttonContainer.on('pointerover', () => {
-            buttonContainer.setScale(1.05);
-            continueText.setTint(0xffffff);
+            buttonContainer.setScale(1.02);
+            continueButton.clear();
+            continueButton.fillStyle(0x2a2a2a, 0.9);
+            continueButton.fillRect(-150, -40, 300, 80);
+            continueButton.lineStyle(2, 0x888888, 1.0);
+            continueButton.strokeRect(-150, -40, 300, 80);
         });
         buttonContainer.on('pointerout', () => {
             buttonContainer.setScale(1.0);
-            continueText.clearTint();
+            continueButton.clear();
+            continueButton.fillStyle(0x1a1a1a, 0.9);
+            continueButton.fillRect(-150, -40, 300, 80);
+            continueButton.lineStyle(2, 0x666666, 1.0);
+            continueButton.strokeRect(-150, -40, 300, 80);
         });
     }
 
@@ -1190,8 +1199,8 @@ export default class ShopScene extends Phaser.Scene {
             const portraitBg = this.add.graphics();
             portraitBg.fillStyle(0x444444, 0.9);
             portraitBg.lineStyle(3, 0x8b4513, 1);
-            portraitBg.fillRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
-            portraitBg.strokeRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+            portraitBg.fillRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize);
+            portraitBg.strokeRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize);
             portraitContainer.add(portraitBg);
             
             // Hero portrait image or fallback icon
@@ -1223,13 +1232,13 @@ export default class ShopScene extends Phaser.Scene {
             const healthBarWidth = 80;
             const healthBarBg = this.add.graphics();
             healthBarBg.fillStyle(0x333333, 0.8);
-            healthBarBg.fillRoundedRect(-healthBarWidth/2, 38, healthBarWidth, 8, 4);
+            healthBarBg.fillRect(-healthBarWidth/2, 38, healthBarWidth, 8);
             portraitContainer.add(healthBarBg);
             
             const healthPercent = hero.currentHealth / hero.maxHealth;
             const healthBar = this.add.graphics();
             healthBar.fillStyle(healthPercent > 0.5 ? 0x4caf50 : healthPercent > 0.25 ? 0xff9800 : 0xf44336, 1);
-            healthBar.fillRoundedRect(-healthBarWidth/2, 38, healthBarWidth * healthPercent, 8, 4);
+            healthBar.fillRect(-healthBarWidth/2, 38, healthBarWidth * healthPercent, 8);
             portraitContainer.add(healthBar);
             
             const healthText = this.add.text(0, 42, `${hero.currentHealth}/${hero.maxHealth}`, {
@@ -1268,8 +1277,8 @@ export default class ShopScene extends Phaser.Scene {
                 portraitBg.clear();
                 portraitBg.fillStyle(0x666666, 0.9);
                 portraitBg.lineStyle(3, 0xffd700, 1);
-                portraitBg.fillRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
-                portraitBg.strokeRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+                portraitBg.fillRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize);
+                portraitBg.strokeRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize);
             });
             clickArea.on('pointerout', () => {
                 portraitContainer.setScale(1.0);
@@ -1277,8 +1286,8 @@ export default class ShopScene extends Phaser.Scene {
                 portraitBg.clear();
                 portraitBg.fillStyle(0x444444, 0.9);
                 portraitBg.lineStyle(3, 0x8b4513, 1);
-                portraitBg.fillRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
-                portraitBg.strokeRoundedRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize, 12);
+                portraitBg.fillRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize);
+                portraitBg.strokeRect(-portraitSize/2, -portraitSize/2, portraitSize, portraitSize);
             });
             
             // Add to tracking array for drag and drop
@@ -1367,8 +1376,8 @@ export default class ShopScene extends Phaser.Scene {
                 const slotBg = this.add.graphics();
                 slotBg.fillStyle(0x333333, 0.3); // Dark gray, semi-transparent
                 slotBg.lineStyle(1, 0x666666, 0.5); // Light gray border
-                slotBg.fillRoundedRect(-itemSize/2, -itemSize/2, itemSize, itemSize, 6);
-                slotBg.strokeRoundedRect(-itemSize/2, -itemSize/2, itemSize, itemSize, 6);
+                slotBg.fillRect(-itemSize/2, -itemSize/2, itemSize, itemSize);
+                slotBg.strokeRect(-itemSize/2, -itemSize/2, itemSize, itemSize);
                 slotBg.x = x;
                 slotBg.y = y;
                 slotBg.setData('isInventoryTitle', true); // So it gets cleared on refresh
@@ -1397,8 +1406,8 @@ export default class ShopScene extends Phaser.Scene {
         const itemBg = this.add.graphics();
         itemBg.fillStyle(0x333333, 0.9);
         itemBg.lineStyle(3, rarityColor, 1);
-        itemBg.fillRoundedRect(-size/2, -size/2, size, size, 8);
-        itemBg.strokeRoundedRect(-size/2, -size/2, size, size, 8);
+        itemBg.fillRect(-size/2, -size/2, size, size);
+        itemBg.strokeRect(-size/2, -size/2, size, size);
         itemContainer.add(itemBg);
         
         // Item icon
