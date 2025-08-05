@@ -136,20 +136,70 @@ export default class AbilityManager {
     }
     
     /**
-     * Handle keyboard shortcuts for abilities (1-9 keys for quick cast)
-     * @param {number} abilityIndex - Index of ability to quick cast
+     * Handle keyboard shortcuts for abilities (QWERTYUIOP keys for quick cast)
+     * @param {string} hotkey - The hotkey pressed (Q, W, E, R, T, Y, U, I, O, P)
      */
-    handleAbilityHotkey(abilityIndex) {
+    handleAbilityHotkey(hotkey) {
+        const hotkeyMap = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'];
+        const abilityIndex = hotkeyMap.indexOf(hotkey.toUpperCase());
+        
+        if (abilityIndex === -1) {
+            console.log(`Invalid hotkey: ${hotkey}`);
+            return;
+        }
+        
         const abilities = this.getAllActiveAbilities();
         if (abilityIndex >= 0 && abilityIndex < abilities.length) {
             const { hero, ability } = abilities[abilityIndex];
             
             const canCastResult = ability.canCast(this.manaSystem, this.getBattleContext());
             if (canCastResult.canCast) {
+                console.log(`Casting ${ability.name} with hotkey ${hotkey}`);
                 // Start targeting for this ability
                 this.abilityPanel.selectAbility(hero, ability, null);
+            } else {
+                console.log(`Cannot cast ${ability.name}: ${canCastResult.reason}`);
+                // Show brief feedback to player
+                this.showHotkeyFeedback(ability, canCastResult.reason);
             }
+        } else if (abilityIndex < abilities.length) {
+            // Valid hotkey but no ability at that index
+            console.log(`No ability assigned to hotkey ${hotkey}`);
         }
+    }
+
+    /**
+     * Show brief feedback when hotkey cannot be used
+     * @param {ActiveAbility} ability - The ability that couldn't be cast
+     * @param {string} reason - Why it couldn't be cast
+     */
+    showHotkeyFeedback(ability, reason) {
+        const feedbackText = this.scene.add.text(
+            this.scene.cameras.main.width / 2,
+            this.scene.cameras.main.height / 2 - 100,
+            `${ability.name}: ${reason}`,
+            {
+                fontSize: '24px',
+                color: '#ff6b6b',
+                fontFamily: 'Arial',
+                backgroundColor: '#000000',
+                padding: { x: 8, y: 4 },
+                align: 'center'
+            }
+        );
+        feedbackText.setOrigin(0.5);
+        feedbackText.setScrollFactor(0);
+        feedbackText.setDepth(2000);
+        
+        // Fade out after short delay
+        this.scene.tweens.add({
+            targets: feedbackText,
+            alpha: 0,
+            y: feedbackText.y - 30,
+            duration: 1500,
+            ease: 'Power2',
+            onComplete: () => feedbackText.destroy()
+        });
     }
     
     /**
@@ -186,6 +236,31 @@ export default class AbilityManager {
         }
     }
     
+    /**
+     * Execute selected ability on current target (Enter key)
+     */
+    executeSelectedAbilityOnCurrentTarget() {
+        if (!this.isInTargetingMode()) {
+            return false;
+        }
+        
+        // Get current target from battle manager
+        const battleManager = this.scene.battleManager;
+        if (!battleManager || !battleManager.getCurrentTarget) {
+            console.log('No battle manager or getCurrentTarget method');
+            return false;
+        }
+        
+        const currentTarget = battleManager.getCurrentTarget();
+        if (!currentTarget || !currentTarget.isAlive) {
+            console.log('No valid current target for ability execution');
+            return false;
+        }
+        
+        // Execute ability on current target
+        return this.abilityPanel.onEnemyTargeted(currentTarget);
+    }
+
     /**
      * Enable/disable the ability panel
      * @param {boolean} enabled

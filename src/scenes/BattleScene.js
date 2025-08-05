@@ -327,6 +327,26 @@ export default class BattleScene extends Phaser.Scene {
             this.battleManager.toggleSortMode();
         });
         
+        // Ability hotkeys (QWERTYUIOP)
+        const abilityHotkeys = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'];
+        abilityHotkeys.forEach(key => {
+            // Skip 'I' since it's already used for info menu
+            if (key === 'I') return;
+            
+            this.input.keyboard.on(`keydown-${key}`, () => {
+                if (this.abilityManager) {
+                    this.abilityManager.handleAbilityHotkey(key);
+                }
+            });
+        });
+        
+        // Enter key to execute selected ability on current target
+        this.input.keyboard.on('keydown-ENTER', () => {
+            if (this.abilityManager) {
+                this.abilityManager.executeSelectedAbilityOnCurrentTarget();
+            }
+        });
+        
         // Set up debug system and presentation mode
         DebugSystem.setupKeyboardShortcut(this);
         

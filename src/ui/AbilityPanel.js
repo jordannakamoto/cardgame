@@ -72,11 +72,11 @@ export default class AbilityPanel {
         // Create buttons for each ability
         allAbilities.forEach(async (abilityData, index) => {
             const yPos = -150 + (index * 100); // More spacing without title
-            await this.createAbilityButton(abilityData.hero, abilityData.ability, 0, yPos);
+            await this.createAbilityButton(abilityData.hero, abilityData.ability, 0, yPos, index);
         });
     }
     
-    async createAbilityButton(hero, ability, x, y) {
+    async createAbilityButton(hero, ability, x, y, index = 0) {
         const buttonContainer = this.scene.add.container(x, y);
         this.panelContainer.add(buttonContainer);
         
@@ -87,6 +87,7 @@ export default class AbilityPanel {
         buttonBg.lineStyle(1, 0xffffff, 0.2); // Subtle white border
         buttonBg.strokeRoundedRect(-140, -40, 280, 80, 12);
         buttonContainer.add(buttonBg);
+        
         
         // Ability name - centered text
         const nameText = this.scene.add.text(0, -15, ability.name, {
