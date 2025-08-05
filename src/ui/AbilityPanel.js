@@ -70,56 +70,74 @@ export default class AbilityPanel {
         console.log('AbilityPanel: Total abilities found:', allAbilities.length);
         
         // Create buttons for each ability
-        allAbilities.forEach((abilityData, index) => {
+        allAbilities.forEach(async (abilityData, index) => {
             const yPos = -150 + (index * 100); // More spacing without title
-            this.createAbilityButton(abilityData.hero, abilityData.ability, 0, yPos);
+            await this.createAbilityButton(abilityData.hero, abilityData.ability, 0, yPos);
         });
     }
     
-    createAbilityButton(hero, ability, x, y) {
+    async createAbilityButton(hero, ability, x, y) {
         const buttonContainer = this.scene.add.container(x, y);
         this.panelContainer.add(buttonContainer);
         
-        // Button background - wider and taller
-        const buttonBg = this.scene.add.rectangle(0, 0, 280, 80, 0x333333);
-        buttonBg.setStrokeStyle(3, 0x666666);
+        // Modern button background with glassmorphic style
+        const buttonBg = this.scene.add.graphics();
+        buttonBg.fillStyle(0xffffff, 0.08); // Semi-transparent white
+        buttonBg.fillRoundedRect(-140, -40, 280, 80, 12); // Rounded corners
+        buttonBg.lineStyle(1, 0xffffff, 0.2); // Subtle white border
+        buttonBg.strokeRoundedRect(-140, -40, 280, 80, 12);
         buttonContainer.add(buttonBg);
         
-        // Ability icon - positioned more to the left
-        const icon = ability.createIcon(this.scene, -100, 0);
-        buttonContainer.add(icon);
-        
-        // Ability name - bigger text
-        const nameText = this.scene.add.text(-50, -15, ability.name, {
-            fontSize: '22px',
+        // Ability name - centered text
+        const nameText = this.scene.add.text(0, -15, ability.name, {
+            fontSize: '28px',
             color: '#ffffff',
             fontFamily: 'Arial',
             fontWeight: 'bold'
         });
-        nameText.setOrigin(0, 0.5);
+        nameText.setOrigin(0.5, 0.5);
         buttonContainer.add(nameText);
         
-        // Mana cost - bigger text
-        const costText = this.scene.add.text(-50, 12, ability.getManaCostString(), {
-            fontSize: '18px',
+        // Mana cost - centered text
+        const costText = this.scene.add.text(0, 12, ability.getManaCostString(), {
+            fontSize: '22px',
             color: '#aaaaaa',
             fontFamily: 'Arial'
         });
-        costText.setOrigin(0, 0.5);
+        costText.setOrigin(0.5, 0.5);
         buttonContainer.add(costText);
         
-        // Make button interactive
-        buttonBg.setInteractive();
-        buttonBg.on('pointerdown', () => {
+        // Make button interactive with hit area
+        const hitArea = this.scene.add.rectangle(0, 0, 280, 80, 0x000000, 0);
+        hitArea.setInteractive();
+        hitArea.on('pointerdown', () => {
             this.selectAbility(hero, ability, buttonContainer);
         });
+        
+        // Hover effects
+        hitArea.on('pointerover', () => {
+            buttonBg.clear();
+            buttonBg.fillStyle(0xffffff, 0.12); // Slightly brighter on hover
+            buttonBg.fillRoundedRect(-140, -40, 280, 80, 12);
+            buttonBg.lineStyle(1, 0xffffff, 0.3);
+            buttonBg.strokeRoundedRect(-140, -40, 280, 80, 12);
+        });
+        
+        hitArea.on('pointerout', () => {
+            buttonBg.clear();
+            buttonBg.fillStyle(0xffffff, 0.08); // Back to normal
+            buttonBg.fillRoundedRect(-140, -40, 280, 80, 12);
+            buttonBg.lineStyle(1, 0xffffff, 0.2);
+            buttonBg.strokeRoundedRect(-140, -40, 280, 80, 12);
+        });
+        
+        buttonContainer.add(hitArea);
         
         // Store references
         const buttonData = {
             container: buttonContainer,
             background: buttonBg,
-            icon: icon,
-            nameText: nameText,
+            hitArea: hitArea,
             costText: costText,
             hero: hero,
             ability: ability,
@@ -138,13 +156,19 @@ export default class AbilityPanel {
         if (canCastResult.canCast) {
             // Ability can be cast - full opacity
             buttonData.container.setAlpha(1.0);
-            buttonData.background.setFillStyle(0x333333);
-            buttonData.background.setStrokeStyle(2, 0x666666);
+            buttonData.background.clear();
+            buttonData.background.fillStyle(0xffffff, 0.08);
+            buttonData.background.fillRoundedRect(-140, -40, 280, 80, 12);
+            buttonData.background.lineStyle(1, 0xffffff, 0.2);
+            buttonData.background.strokeRoundedRect(-140, -40, 280, 80, 12);
         } else {
-            // Ability cannot be cast - transparent
-            buttonData.container.setAlpha(0.4);
-            buttonData.background.setFillStyle(0x222222);
-            buttonData.background.setStrokeStyle(2, 0x444444);
+            // Ability cannot be cast - very transparent
+            buttonData.container.setAlpha(0.3);
+            buttonData.background.clear();
+            buttonData.background.fillStyle(0xffffff, 0.04);
+            buttonData.background.fillRoundedRect(-140, -40, 280, 80, 12);
+            buttonData.background.lineStyle(1, 0xffffff, 0.1);
+            buttonData.background.strokeRoundedRect(-140, -40, 280, 80, 12);
         }
     }
     
@@ -166,7 +190,12 @@ export default class AbilityPanel {
         // Highlight selected button
         this.abilityButtons.forEach(btn => {
             const isSelected = buttonContainer && btn.container === buttonContainer;
-            btn.background.setStrokeStyle(2, isSelected ? 0x00ff00 : 0x666666);
+            // Redraw background with highlight
+            btn.background.clear();
+            btn.background.fillStyle(0xffffff, 0.08);
+            btn.background.fillRoundedRect(-140, -40, 280, 80, 12);
+            btn.background.lineStyle(2, isSelected ? 0x00ff00 : 0xffffff, isSelected ? 0.5 : 0.2);
+            btn.background.strokeRoundedRect(-140, -40, 280, 80, 12);
         });
     }
     
@@ -176,23 +205,8 @@ export default class AbilityPanel {
         // Change cursor or show targeting UI
         this.scene.input.setDefaultCursor('crosshair');
         
-        // Show targeting instructions
-        const instructionText = this.scene.add.text(
-            this.scene.cameras.main.width / 2,
-            50,
-            'Click on target to cast ability, or press ESC to cancel',
-            {
-                fontSize: '20px',
-                color: '#ffff00',
-                fontFamily: 'Arial',
-                backgroundColor: '#000000',
-                padding: { x: 10, y: 5 }
-            }
-        );
-        instructionText.setOrigin(0.5);
-        instructionText.setScrollFactor(0);
-        instructionText.setDepth(2000);
-        this.targetingInstruction = instructionText;
+        // Targeting instructions removed for cleaner interface
+        // ESC still works to cancel targeting
         
         // Set up targeting event listeners
         this.setupTargetingListeners();
@@ -228,7 +242,11 @@ export default class AbilityPanel {
         
         // Reset button highlights
         this.abilityButtons.forEach(btn => {
-            btn.background.setStrokeStyle(2, 0x666666);
+            btn.background.clear();
+            btn.background.fillStyle(0xffffff, 0.08);
+            btn.background.fillRoundedRect(-140, -40, 280, 80, 12);
+            btn.background.lineStyle(1, 0xffffff, 0.2);
+            btn.background.strokeRoundedRect(-140, -40, 280, 80, 12);
         });
     }
     
@@ -310,6 +328,8 @@ export default class AbilityPanel {
             this.updateAbilityDisplay();
         });
     }
+    
+    
     
     destroy() {
         this.exitTargetingMode();

@@ -21,10 +21,11 @@ export default class BattleManager {
         this.victoryClickHandler = null;
         this.sortByRank = true; // true = by rank, false = by suit
         this.isFirstHandOfBattle = true; // Track if this is the first hand drawn
+        this.isAttackInProgress = false; // Prevent multiple simultaneous attacks
 
         // Discard system
-        this.discardsRemaining = 1; // Default 1 discard per battle
-        this.maxDiscards = 1;
+        this.discardsRemaining = 2; // Default 2 discards per battle
+        this.maxDiscards = 2;
 
         // Damage multipliers for poker hands
         this.damageTable = {
@@ -246,10 +247,13 @@ export default class BattleManager {
     }
 
     attackSelectedEnemy() {
-        if (!this.isPlayerTurn || this.selectedCards.length === 0) return;
+        if (!this.isPlayerTurn || this.selectedCards.length === 0 || this.isAttackInProgress) return;
 
         const targetEnemy = this.enemies[this.selectedEnemyIndex];
         if (!targetEnemy || !targetEnemy.isAlive) return;
+
+        // Immediately disable further attacks until this one completes
+        this.isAttackInProgress = true;
 
         // Get the selected cards
         const selectedCards = this.getSelectedCards();
@@ -257,12 +261,18 @@ export default class BattleManager {
         // Check if any selected card has chain trait
         const chainCard = selectedCards.find(card => card && card.hasChain && card.hasChain());
 
-        if (chainCard) {
-            // Handle chain attack
-            this.executeChainAttack(chainCard, selectedCards, targetEnemy);
-        } else {
-            // Handle normal attack
-            this.executeNormalAttack(selectedCards, targetEnemy);
+        try {
+            if (chainCard) {
+                // Handle chain attack
+                this.executeChainAttack(chainCard, selectedCards, targetEnemy);
+            } else {
+                // Handle normal attack
+                this.executeNormalAttack(selectedCards, targetEnemy);
+            }
+        } catch (error) {
+            console.error('Attack execution error:', error);
+            // Reset attack flag on error
+            this.isAttackInProgress = false;
         }
     }
 
@@ -312,6 +322,19 @@ export default class BattleManager {
             totalDamage,
             targetEnemy
         );
+
+        // Emit handPlayed event for chain attack with all cards used
+        const allCardsUsed = [...selectedCards];
+        additionalHands.forEach(handData => {
+            allCardsUsed.push(...handData.cards);
+        });
+        
+        this.scene.events.emit('handPlayed', {
+            selectedCards: allCardsUsed,
+            isChainAttack: true,
+            chainLength: allHands.length,
+            totalDamage: totalDamage
+        });
 
         // Clean up chain text effects before removing cards
         this.cleanupChainEffects();
@@ -435,8 +458,6 @@ export default class BattleManager {
                 enemyCount: this.enemies.filter(e => e.isAlive).length
             });
 
-            // Generate mana from played cards (disabled for now)
-            // this.scene.heroManager.generateManaForActiveHero(selectedCards);
         }
 
         // Show hand result
@@ -642,6 +663,10 @@ export default class BattleManager {
         this.enemies.forEach(enemy => enemy.hideDamagePreview());
 
         this.selectedCards = [];
+        
+        // Re-enable attacks now that this attack is complete
+        this.isAttackInProgress = false;
+        
         this.scene.events.emit('handChanged', this.playerHand, this.selectedCards);
     }
 
@@ -993,6 +1018,7 @@ export default class BattleManager {
         }
 
         this.isPlayerTurn = true;
+        this.isAttackInProgress = false; // Reset attack flag at start of turn
         console.log('Starting player turn with', this.enemies.length, 'enemies,', this.getAliveEnemies().length, 'alive');
 
         // Notify ability manager of turn start
